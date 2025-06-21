@@ -15,9 +15,7 @@ A feature-rich Discord bot for managing a pet shop with ticket system, order man
 - **Confirmation Buttons**: Yes/No buttons for actions
 - **Smart Suggestions**: Helpful alternatives when no match found
 - **Real-time Updates**: Live inventory tracking
-- **Beautiful Embeds**: Professional-looking displays
-- **Pet Orders**: Users can specify pets (e.g., "2 dogs, 1 cat, 3 hamsters")
-- **Sheckle Orders**: Users can specify sheckles (e.g., "1000 sheckles, 500 silver sheckles")
+- **Sheckle Orders**: Users can now order sheckles
 
 ### 📦 **Stock Management**
 - Dynamic stock embed with real-time updates
