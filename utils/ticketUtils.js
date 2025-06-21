@@ -86,7 +86,8 @@ async function handleTicketClose(interaction, isConfirmed = false) {
    // Check if this is a ticket channel with more flexible detection
    // We only want to handle support tickets here, not orders
    if (!channel.name.toLowerCase().includes('support-') &&
-      !channel.name.toLowerCase().includes('ticket-')) {
+      !channel.name.toLowerCase().includes('ticket-') &&
+      !channel.name.toLowerCase().includes('roblox-dev-')) {
       return interaction.reply({
          content: '❌ This command can only be used in support ticket channels',
          ephemeral: true
@@ -204,7 +205,8 @@ async function markAsProcessing(interaction) {
    // Fix: More flexible ticket channel detection - works for both support and order tickets
    if (!channel.name.toLowerCase().includes('ticket-') &&
       !channel.name.toLowerCase().includes('support-') &&
-      !channel.name.toLowerCase().includes('order-')) {
+      !channel.name.toLowerCase().includes('order-') &&
+      !channel.name.toLowerCase().includes('roblox-dev-')) {
       return interaction.reply({
          content: '❌ This command can only be used in ticket or order channels',
          ephemeral: true
@@ -236,7 +238,7 @@ async function markAsProcessing(interaction) {
                await channel.setParent(processingCategory.id, { lockPermissions: false });
 
                // Ensure the permissions remain the same (only ticket creator and admins)
-               if (channel.name.includes('support-') || channel.name.includes('ticket-')) {
+               if (channel.name.includes('support-') || channel.name.includes('ticket-') || channel.name.includes('roblox-dev-')) {
                   // For support tickets, ensure admin-only permissions
                   const adminRoleId = process.env.ADMIN_ROLE_ID;
                   const ticketUserId = channel.topic?.split(':')[1]?.trim();
@@ -331,7 +333,7 @@ async function markAsProcessing(interaction) {
                .setStyle(ButtonStyle.Secondary)
          );
       } else {
-         // Support ticket buttons
+         // Support ticket buttons (including roblox-dev-)
          actionRow.addComponents(
             new ButtonBuilder()
                .setCustomId('ticket_complete')
@@ -395,7 +397,8 @@ async function unmarkProcessing(interaction) {
    // Fix: More flexible ticket channel detection - works for both tickets
    if (!channel.name.toLowerCase().includes('ticket-') &&
       !channel.name.toLowerCase().includes('support-') &&
-      !channel.name.toLowerCase().includes('order-')) {
+      !channel.name.toLowerCase().includes('order-') &&
+      !channel.name.toLowerCase().includes('roblox-dev-')) {
       return interaction.reply({
          content: '❌ This command can only be used in ticket or order channels',
          ephemeral: true
@@ -427,7 +430,7 @@ async function unmarkProcessing(interaction) {
                await channel.setParent(openCategory.id, { lockPermissions: false });
 
                // Ensure the permissions remain the same (only ticket creator and admins)
-               if (channel.name.includes('support-') || channel.name.includes('ticket-')) {
+               if (channel.name.includes('support-') || channel.name.includes('ticket-') || channel.name.includes('roblox-dev-')) {
                   // For support tickets, ensure that proper permissions are maintained
                   const adminRoleId = process.env.ADMIN_ROLE_ID;
                   const ticketUserId = channel.topic?.split(':')[1]?.trim();
@@ -505,7 +508,7 @@ async function unmarkProcessing(interaction) {
                .setStyle(ButtonStyle.Primary)
          );
       } else {
-         // Support ticket buttons
+         // Support ticket buttons (including roblox-dev-)
          actionRow.addComponents(
             new ButtonBuilder()
                .setCustomId('ticket_complete')

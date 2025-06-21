@@ -13,7 +13,7 @@ async function handleTicketComplete(interaction) {
       });
    }
    const channel = interaction.channel;
-   if (!channel.name.includes('support-') && !channel.name.includes('ticket-')) {
+   if (!channel.name.includes('support-') && !channel.name.includes('ticket-') && !channel.name.includes('roblox-dev-')) {
       return await interaction.reply({
          content: '❌ This command can only be used in support ticket channels',
          ephemeral: true
@@ -41,7 +41,7 @@ async function handleTicketComplete(interaction) {
    setTimeout(async () => {
       try {
          const ticketParts = channel.name.split('-');
-         const ticketId = ticketParts.length >= 3 ? ticketParts.slice(2).join('-') : channel.name.replace(/^(support-|ticket-)/, '');
+         const ticketId = ticketParts.length >= 3 ? ticketParts.slice(2).join('-') : channel.name.replace(/^(support-|ticket-|roblox-dev-)/, '');
          const archivedCategoryId = process.env.TICKETS_ARCHIVED_CATEGORY;
          if (archivedCategoryId) {
             try {
@@ -89,7 +89,7 @@ async function handleTicketComplete(interaction) {
 async function markAsProcessing(interaction) {
    try {
       const channel = interaction.channel;
-      if (!channel.name.startsWith('support-') && !channel.name.includes('order-')) {
+      if (!channel.name.startsWith('support-') && !channel.name.includes('order-') && !channel.name.startsWith('roblox-dev-')) {
          return interaction.reply({
             content: '❌ This command can only be used in ticket or order channels',
             ephemeral: true
@@ -104,7 +104,7 @@ async function markAsProcessing(interaction) {
             ephemeral: true
          });
       }
-      const isTicket = channel.name.startsWith('support-');
+      const isTicket = channel.name.startsWith('support-') || channel.name.startsWith('roblox-dev-');
       const isOrder = channel.name.includes('order-');
       const processingCategoryId = process.env.TICKETS_PROCESSING_CATEGORY;
       let processingCategory = null;
@@ -162,7 +162,8 @@ async function unmarkProcessing(interaction) {
    try {
       const channel = interaction.channel;
       if (!channel.name.startsWith('⚙️support-') && !channel.name.startsWith('⚙️order-') &&
-         !channel.name.startsWith('support-') && !channel.name.startsWith('order-')) {
+         !channel.name.startsWith('support-') && !channel.name.startsWith('order-') &&
+         !channel.name.startsWith('⚙️roblox-dev-') && !channel.name.startsWith('roblox-dev-')) {
          return interaction.reply({
             content: '❌ This command can only be used in ticket or order channels',
             ephemeral: true
@@ -177,7 +178,7 @@ async function unmarkProcessing(interaction) {
             ephemeral: true
          });
       }
-      const isTicket = channel.name.includes('support-');
+      const isTicket = channel.name.includes('support-') || channel.name.includes('roblox-dev-');
       const isOrder = channel.name.includes('order-');
       const openCategoryId = process.env.TICKETS_OPEN_CATEGORY;
       let openCategory = null;
