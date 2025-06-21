@@ -427,16 +427,16 @@ module.exports = {
          }
 
          // Create dynamic example based on actual items
-         let exampleText = 'Enter items, pets, and sheckles';
+         let exampleText = 'Enter Pets, and sheckles';
          if (sampleItems.length > 0) {
             const examples = sampleItems.map(item => `1 ${item.name}`).join(', ');
-            exampleText = `e.g. ${examples}, 2 dogs, 1000 sheckles`;
+            exampleText = `e.g. ${examples}, 2 Bear Bee, 5T sheckles`;
          }
 
-         // Add a multi-line input for items, pets, and sheckles
+         // Add a multi-line input for Pets and Sheckles
          const itemsInput = new TextInputBuilder()
             .setCustomId('orderItems')
-            .setLabel('Items, Pets, and Sheckles')
+            .setLabel('Pets, and Sheckles')
             .setPlaceholder(exampleText)
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(true);
