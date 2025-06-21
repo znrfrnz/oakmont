@@ -232,7 +232,7 @@ async function updateStockEmbed(client, db) {
          // Add ordering instructions with better formatting
          stockEmbed.addFields({
             name: '\n🛒 How to Order',
-            value: '```md\n# Step 1: Go to the help desk channel\n# Step 2: Click "Place an Order"\n# Step 3: Fill out the order form\n# Step 4: Wait for staff to process your order\n\n*All orders are processed manually by our staff*```',
+            value: '```md\n# Step 1: Go to the Orders channel\n# Step 2: Click "Place an Order"\n# Step 3: Fill out the order form\n# Step 4: Wait for staff to process your order\n\n*All orders are processed manually by our staff*```',
             inline: false
          });
 
