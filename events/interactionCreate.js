@@ -477,12 +477,12 @@ module.exports = {
             return;
          }
 
-         if (interaction.customId.startsWith('faq_edit_modal-')) {
+         if (interaction.customId === 'faq_edit_modal') {
             await handleFaqEditModalSubmit(interaction, db);
             return;
          }
 
-         if (interaction.customId.startsWith('faq_reorder_modal-')) {
+         if (interaction.customId === 'faq_reorder_modal') {
             await handleFaqReorderModalSubmit(interaction, db);
             return;
          }

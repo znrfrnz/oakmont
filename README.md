@@ -23,9 +23,11 @@ A feature-rich Discord bot for managing a pet shop with ticket system, order man
 - Low stock alerts
 
 ### ❓ **FAQ System**
-- Dynamic FAQ management
-- Easy editing and reordering
-- Persistent storage
+- Dynamic FAQ management with modal forms
+- Easy editing and reordering with select menus
+- Persistent storage in SQLite database
+- Automatic embed updates in designated channel
+- Position-based ordering system
 
 ## 🚀 Setup
 
@@ -62,6 +64,7 @@ A feature-rich Discord bot for managing a pet shop with ticket system, order man
    TICKETS_ARCHIVED_CATEGORY=your_archived_category_id
    SHOP_CHANNEL_ID=your_shop_channel_id
    TICKETS_LOGS_CHANNEL=your_logs_channel_id
+   FAQ_CHANNEL_ID=your_faq_channel_id
    ```
 
 5. **Deploy slash commands**
@@ -83,6 +86,12 @@ A feature-rich Discord bot for managing a pet shop with ticket system, order man
 - `/stock update` - Update stock display
 - `/stock list` - List all inventory items
 - `/setup-order-button` - Create order button
+- `/faq add` - Add new FAQ entry with modal form
+- `/faq edit` - Edit existing FAQ entry
+- `/faq remove` - Remove FAQ entry
+- `/faq list` - List all FAQ entries
+- `/faq reorder` - Change FAQ entry positions
+- `/faq update` - Force update FAQ embed display
 
 ### User Commands
 - `/ticket` - Ticket management commands
