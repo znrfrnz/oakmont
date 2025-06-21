@@ -85,35 +85,61 @@ async function handleOrderSubmit(interaction, db) {
       const orderNumber = Date.now();
       const itemsRaw = interaction.fields.getTextInputValue('orderItems');
       const specialRequests = interaction.fields.getTextInputValue('orderRequests') || '';
-      const itemRegex = /([0-9]+)\s+([a-zA-Z0-9 _-]+)/g;
-      let match;
+
+      // Parse the combined input to separate items, pets, and sheckles
+      const lines = itemsRaw.split('\n').map(line => line.trim()).filter(line => line.length > 0);
       const items = [];
-      while ((match = itemRegex.exec(itemsRaw)) !== null) {
-         items.push({
-            name: match[2].trim(),
-            quantity: parseInt(match[1], 10)
-         });
-      }
-      if (items.length === 0) {
-         return await interaction.editReply({
-            content: '❌ Please specify at least one item and quantity, e.g. "2 item name, 1 another item"',
-            ephemeral: true
-         });
-      }
-      let totalPrice = 0;
-      let orderDetails = [];
-      let matchedItems = [];
-      let unmatchedItems = [];
+      const pets = [];
+      const sheckles = [];
+
+      // Get all stock items (case-insensitive)
       const allItems = await new Promise((resolve, reject) => {
          db.all('SELECT * FROM stock', (err, rows) => {
             if (err) reject(err);
             else resolve(rows || []);
          });
       });
-      for (const item of items) {
-         const match = findBestMatch(item.name, allItems);
-         if (match && match.score >= 70) {
-            const matchedItem = match.item;
+      const stockNames = allItems.map(i => i.name.toLowerCase());
+
+      for (const line of lines) {
+         // Sheckles
+         if (line.toLowerCase().includes('sheckle')) {
+            sheckles.push(line);
+            continue;
+         }
+         // Try to match as item (number + item name)
+         const itemMatch = line.match(/^([0-9]+)\s+(.+)$/);
+         if (itemMatch) {
+            const itemName = itemMatch[2].trim();
+            // Only treat as item if it matches a stock item
+            const stockIndex = stockNames.indexOf(itemName.toLowerCase());
+            if (stockIndex !== -1) {
+               items.push({
+                  name: allItems[stockIndex].name,
+                  quantity: parseInt(itemMatch[1], 10),
+                  price: allItems[stockIndex].price
+               });
+               continue;
+            }
+         }
+         // If not a stock item and not sheckles, treat as pet
+         pets.push(line);
+      }
+
+      if (items.length === 0 && pets.length === 0 && sheckles.length === 0) {
+         return await interaction.editReply({
+            content: '❌ Please specify at least one valid item, pet, or sheckle in your order.',
+            ephemeral: true
+         });
+      }
+
+      let totalPrice = 0;
+      let orderDetails = [];
+      let unmatchedItems = [];
+      // Process items
+      if (items.length > 0) {
+         for (const item of items) {
+            const matchedItem = allItems.find(i => i.name.toLowerCase() === item.name.toLowerCase());
             if (matchedItem.quantity < item.quantity) {
                return await interaction.editReply({
                   content: `❌ Not enough stock for ${matchedItem.name}. Only ${matchedItem.quantity} left.`,
@@ -125,41 +151,11 @@ async function handleOrderSubmit(interaction, db) {
                name: matchedItem.name,
                quantity: item.quantity,
                price: matchedItem.price,
-               subtotal: matchedItem.price * item.quantity,
-               originalInput: item.name,
-               matchType: match.type,
-               matchScore: match.score
+               subtotal: matchedItem.price * item.quantity
             });
-            matchedItems.push({
-               original: item.name,
-               matched: matchedItem.name,
-               type: match.type,
-               score: match.score
-            });
-         } else {
-            unmatchedItems.push(item.name);
          }
       }
-      if (unmatchedItems.length > 0) {
-         const unmatchedList = unmatchedItems.join(', ');
-         return await interaction.editReply({
-            content: `❌ Could not find these items: ${unmatchedList}\n\nPlease check the spelling or use the exact item name from the shop.`,
-            ephemeral: true
-         });
-      }
-      if (matchedItems.length > 0) {
-         const corrections = matchedItems
-            .filter(match => match.original !== match.matched)
-            .map(match => `"${match.original}" → "${match.matched}" (${match.type} match)`)
-            .join('\n');
-         if (corrections) {
-            await interaction.editReply({
-               content: `📝 **Item Corrections Applied:**\n${corrections}\n\n✅ Order will proceed with corrected items.`,
-               ephemeral: true
-            });
-            await new Promise(resolve => setTimeout(resolve, 2000));
-         }
-      }
+
       const channelOptions = {
          name: `order-${interaction.user.username}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
          type: ChannelType.GuildText,
@@ -185,6 +181,7 @@ async function handleOrderSubmit(interaction, db) {
             }
          ]
       };
+
       const adminRoleId = process.env.ADMIN_ROLE_ID;
       if (adminRoleId) {
          channelOptions.permissionOverwrites.push({
@@ -199,6 +196,7 @@ async function handleOrderSubmit(interaction, db) {
             ]
          });
       }
+
       const openCategoryId = process.env.TICKETS_OPEN_CATEGORY;
       let orderCategory = null;
       if (openCategoryId) {
@@ -226,23 +224,58 @@ async function handleOrderSubmit(interaction, db) {
             ephemeral: true
          });
       }
+
       const orderChannel = await guild.channels.create({
          ...channelOptions,
          parent: orderCategory.id
       });
+
+      // Create order embed with all fields
       const orderEmbed = new EmbedBuilder()
          .setTitle(`Order #${orderNumber}`)
          .setDescription(`Order placed by ${interaction.user}`)
          .setColor(0xf39c12)
-         .addFields(
-            ...orderDetails.map(od => ({
-               name: `${od.quantity} x ${od.name}`,
-               value: `@ $${od.price.toLocaleString()} each = $${od.subtotal.toLocaleString()}`
-            })),
-            { name: 'Total Price', value: `$${totalPrice.toLocaleString()}` },
-            { name: 'Special Requests', value: specialRequests || 'None' }
-         )
          .setTimestamp();
+
+      // Add items if any exist
+      if (orderDetails.length > 0) {
+         orderDetails.forEach(od => {
+            orderEmbed.addFields({
+               name: `${od.quantity} x ${od.name}`,
+               value: `@ $${od.price.toLocaleString()} each = $${od.subtotal.toLocaleString()}`,
+               inline: false
+            });
+         });
+         orderEmbed.addFields({ name: 'Total Price', value: `$${totalPrice.toLocaleString()}` });
+      }
+
+      // Add pets field if provided
+      if (pets.length > 0) {
+         orderEmbed.addFields({
+            name: 'Other Pets',
+            value: pets.join('\n'),
+            inline: false
+         });
+      }
+
+      // Add sheckles field if provided
+      if (sheckles.length > 0) {
+         orderEmbed.addFields({
+            name: 'Sheckles (Trillions)',
+            value: sheckles.join('\n'),
+            inline: false
+         });
+      }
+
+      // Add special requests field if provided
+      if (specialRequests.trim()) {
+         orderEmbed.addFields({
+            name: '📝 Special Requests',
+            value: specialRequests.trim(),
+            inline: false
+         });
+      }
+
       const buttonRow = new ActionRowBuilder()
          .addComponents(
             new ButtonBuilder()
@@ -266,16 +299,36 @@ async function handleOrderSubmit(interaction, db) {
                .setEmoji('❌')
                .setStyle(ButtonStyle.Danger)
          );
+
       await orderChannel.send({
          content: `${interaction.user} Your order has been created!`,
          embeds: [orderEmbed],
          components: [buttonRow]
       });
-      const orderSummary = orderDetails.map(od => `${od.quantity}x ${od.name}`).join(', ');
+
+      // Create confirmation message
+      let confirmationMessage = '✅ Your order has been created!\n\n';
+
+      if (orderDetails.length > 0) {
+         const orderSummary = orderDetails.map(od => `${od.quantity}x ${od.name}`).join(', ');
+         confirmationMessage += `🛒 Items: ${orderSummary}\n`;
+      }
+
+      if (pets.length > 0) {
+         confirmationMessage += `Other Pets: ${pets.join(', ')}\n`;
+      }
+
+      if (sheckles.length > 0) {
+         confirmationMessage += `Sheckles (Trillions): ${sheckles.join(', ')}\n`;
+      }
+
+      confirmationMessage += `\nPlease check ${orderChannel} for details and updates.`;
+
       await interaction.editReply({
-         content: `✅ Your order for ${orderSummary} has been created! Please check ${orderChannel} for details and updates.`,
+         content: confirmationMessage,
          ephemeral: true
       }).catch(err => console.error("Error editing reply:", err));
+
       if (typeof updateQueueEmbed === 'function') {
          updateQueueEmbed(interaction.client).catch(err => {
             console.error('Error updating queue display:', err);

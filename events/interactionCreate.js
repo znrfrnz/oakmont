@@ -427,19 +427,20 @@ module.exports = {
          }
 
          // Create dynamic example based on actual items
-         let exampleText = 'Enter items and quantities';
+         let exampleText = 'Enter items, pets, and sheckles';
          if (sampleItems.length > 0) {
             const examples = sampleItems.map(item => `1 ${item.name}`).join(', ');
-            exampleText = `e.g. ${examples}`;
+            exampleText = `e.g. ${examples}, 2 dogs, 1000 sheckles`;
          }
 
-         // Add a multi-line input for items and quantities
+         // Add a multi-line input for items, pets, and sheckles
          const itemsInput = new TextInputBuilder()
             .setCustomId('orderItems')
-            .setLabel('Items and Quantities')
+            .setLabel('Items, Pets, and Sheckles')
             .setPlaceholder(exampleText)
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(true);
+
          const requestsInput = new TextInputBuilder()
             .setCustomId('orderRequests')
             .setLabel('Special Requests (Optional)')
@@ -447,11 +448,14 @@ module.exports = {
             .setStyle(TextInputStyle.Paragraph)
             .setMaxLength(1000)
             .setRequired(false);
+
          // Add inputs to rows
          const itemsRow = new ActionRowBuilder().addComponents(itemsInput);
          const requestsRow = new ActionRowBuilder().addComponents(requestsInput);
+
          // Add the rows to the modal
          modal.addComponents(itemsRow, requestsRow);
+
          // Show the modal to the user immediately
          await interaction.showModal(modal);
          return;
