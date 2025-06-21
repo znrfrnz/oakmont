@@ -461,6 +461,58 @@ module.exports = {
          return;
       }
 
+      // 🎮 Roblox Game Dev Service ticket creation
+      if (customId === 'roblox_dev_service') {
+         // Show the modal for creating a Roblox game dev service ticket
+         const modal = new ModalBuilder()
+            .setCustomId('roblox_dev_ticket_modal')
+            .setTitle('Create Roblox Game Dev Service Ticket');
+
+         // Add inputs for Roblox game dev ticket details
+         const subjectInput = new TextInputBuilder()
+            .setCustomId('robloxTicketSubject')
+            .setLabel('Project/Game Name')
+            .setPlaceholder('Name of your Roblox game or project')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(100);
+
+         const descriptionInput = new TextInputBuilder()
+            .setCustomId('robloxTicketDescription')
+            .setLabel('Service Description')
+            .setPlaceholder('Describe what game development service you need (scripting, building, UI design, etc.)')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(1000);
+
+         const budgetInput = new TextInputBuilder()
+            .setCustomId('robloxTicketBudget')
+            .setLabel('Budget Range (Optional)')
+            .setPlaceholder('e.g., $50-100, 1000-2000 robux, etc.')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(50);
+
+         const timelineInput = new TextInputBuilder()
+            .setCustomId('robloxTicketTimeline')
+            .setLabel('Timeline (Optional)')
+            .setPlaceholder('e.g., 1 week, 2-3 days, ASAP')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(50);
+
+         // Add inputs to the modal
+         const firstActionRow = new ActionRowBuilder().addComponents(subjectInput);
+         const secondActionRow = new ActionRowBuilder().addComponents(descriptionInput);
+         const thirdActionRow = new ActionRowBuilder().addComponents(budgetInput);
+         const fourthActionRow = new ActionRowBuilder().addComponents(timelineInput);
+
+         modal.addComponents(firstActionRow, secondActionRow, thirdActionRow, fourthActionRow);
+
+         await interaction.showModal(modal);
+         return;
+      }
+
       // Handle modal submissions
       if (interaction.isModalSubmit()) {
          // Handle order modal submission
@@ -472,6 +524,12 @@ module.exports = {
          // Handle ticket modal submission
          if (interaction.customId === 'ticket_create_modal') {
             await handleTicketModalSubmit(interaction);
+            return;
+         }
+
+         // Handle Roblox game dev service ticket modal submission
+         if (interaction.customId === 'roblox_dev_ticket_modal') {
+            await handleRobloxDevTicketModalSubmit(interaction);
             return;
          }
 
@@ -699,6 +757,180 @@ async function handleTicketModalSubmit(interaction) {
       try {
          await interaction.editReply({
             content: `❌ Error creating ticket: ${error.message}`,
+            ephemeral: true
+         }).catch(err => console.error("Error editing reply:", err));
+      } catch (replyError) {
+         console.error('Error sending error message:', replyError);
+      }
+   }
+}
+
+/**
+ * Handles a Roblox game development service ticket modal submission
+ * @param {ModalSubmitInteraction} interaction - The modal submit interaction
+ */
+async function handleRobloxDevTicketModalSubmit(interaction) {
+   try {
+      // Get values from the modal
+      const projectName = interaction.fields.getTextInputValue('robloxTicketSubject');
+      const serviceDescription = interaction.fields.getTextInputValue('robloxTicketDescription');
+      const budget = interaction.fields.getTextInputValue('robloxTicketBudget') || 'Not specified';
+      const timeline = interaction.fields.getTextInputValue('robloxTicketTimeline') || 'Not specified';
+
+      // Defer the reply to give us time to create the channel
+      await interaction.deferReply({ ephemeral: true }).catch(err => {
+         console.error("Failed to defer reply:", err);
+         // Continue execution even if deferral fails
+      });
+
+      // Create a channel name based on the user's name and project
+      const randomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+      const channelName = `roblox-dev-${interaction.user.username}-${randomId}`;
+
+      // Create proper permission structure
+      const permissionOverwrites = [
+         {
+            // Deny everyone by default
+            id: interaction.guild.id, // @everyone role
+            deny: [
+               PermissionFlagsBits.ViewChannel,
+               PermissionFlagsBits.SendMessages,
+               PermissionFlagsBits.ReadMessageHistory
+            ]
+         },
+         {
+            // Allow the ticket creator
+            id: interaction.user.id,
+            allow: [
+               PermissionFlagsBits.ViewChannel,
+               PermissionFlagsBits.SendMessages,
+               PermissionFlagsBits.ReadMessageHistory,
+               PermissionFlagsBits.AddReactions
+            ]
+         }
+      ];
+
+      // Add admin role permissions
+      const adminRoleId = process.env.ADMIN_ROLE_ID;
+      if (adminRoleId) {
+         permissionOverwrites.push({
+            id: adminRoleId,
+            allow: [
+               PermissionFlagsBits.ViewChannel,
+               PermissionFlagsBits.SendMessages,
+               PermissionFlagsBits.ReadMessageHistory,
+               PermissionFlagsBits.ManageMessages,
+               PermissionFlagsBits.ManageChannels,
+               PermissionFlagsBits.AddReactions
+            ]
+         });
+      }
+
+      // --- TICKET CATEGORY ENFORCEMENT ---
+      // Always fetch and require the open tickets category from .env
+      const openCategoryId = process.env.TICKETS_OPEN_CATEGORY;
+      let ticketCategory = null;
+      if (openCategoryId) {
+         try {
+            const fetchedCategory = await interaction.guild.channels.fetch(openCategoryId);
+            if (fetchedCategory && fetchedCategory.type === ChannelType.GuildCategory) {
+               ticketCategory = fetchedCategory;
+               console.log(`Found open tickets category: ${ticketCategory.name}`);
+            } else {
+               console.error(`Channel ${openCategoryId} exists but is not a category. Ticket will NOT be created.`);
+               return await interaction.reply({
+                  content: '❌ Ticket category misconfiguration. Please contact an admin.',
+                  ephemeral: true
+               });
+            }
+         } catch (err) {
+            console.error('Error fetching open tickets category:', err);
+            return await interaction.reply({
+               content: '❌ Could not find the open tickets category. Please contact an admin.',
+               ephemeral: true
+            });
+         }
+      } else {
+         return await interaction.reply({
+            content: '❌ Ticket category is not set in the .env file. Please contact an admin.',
+            ephemeral: true
+         });
+      }
+      // --- END ENFORCEMENT ---
+
+      // Create the ticket channel - always set parent to the open tickets category
+      const channelOptions = {
+         name: channelName,
+         type: ChannelType.GuildText,
+         permissionOverwrites: permissionOverwrites,
+         topic: `Roblox Game Dev Service ticket for ${interaction.user.tag}: ${interaction.user.id}`,
+         reason: `Roblox Game Dev Service ticket created by ${interaction.user.tag}`,
+         parent: ticketCategory.id
+      };
+      const ticketChannel = await interaction.guild.channels.create(channelOptions);
+
+      // Create the ticket embed
+      const ticketEmbed = new EmbedBuilder()
+         .setTitle(`🎮 Roblox Game Dev Service: ${projectName}`)
+         .setDescription(`Game development service request by ${interaction.user}`)
+         .setColor(0x9b59b6) // Purple color for Roblox dev service
+         .addFields(
+            { name: 'Project/Game Name', value: projectName, inline: true },
+            { name: 'Budget Range', value: budget, inline: true },
+            { name: 'Timeline', value: timeline, inline: true },
+            { name: 'Service Description', value: serviceDescription || 'No description provided' }
+         )
+         .setTimestamp();
+
+      // Add buttons for managing the ticket
+      const buttonRow = new ActionRowBuilder()
+         .addComponents(
+            new ButtonBuilder()
+               .setCustomId('ticket_processing')
+               .setLabel('Mark as Processing')
+               .setEmoji('⚙️')
+               .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+               .setCustomId('ticket_unprocessing')
+               .setLabel('Unmark Processing')
+               .setEmoji('📝')
+               .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+               .setCustomId('ticket_complete')
+               .setLabel('Complete Ticket')
+               .setEmoji('✅')
+               .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+               .setCustomId('ticket_close')
+               .setLabel('Close Ticket')
+               .setEmoji('❌')
+               .setStyle(ButtonStyle.Danger)
+         );
+
+      // Send the ticket details to the new channel
+      await ticketChannel.send({
+         content: `${interaction.user} Your Roblox Game Dev Service ticket has been created!`,
+         embeds: [ticketEmbed],
+         components: [buttonRow]
+      });
+
+      // Send confirmation to the user
+      await interaction.editReply({
+         content: `✅ Your Roblox Game Dev Service ticket has been created! Please check ${ticketChannel} for assistance.`,
+         ephemeral: true
+      }).catch(err => console.error("Error editing reply:", err));
+
+      // Update the queue display if that function exists
+      if (typeof updateQueueEmbed === 'function') {
+         updateQueueEmbed(interaction.client).catch(err => {
+            console.error('Error updating queue display:', err);
+         });
+      }
+   } catch (error) {
+      console.error('Error creating Roblox dev ticket:', error);
+      try {
+         await interaction.editReply({
+            content: `❌ Error creating Roblox dev ticket: ${error.message}`,
             ephemeral: true
          }).catch(err => console.error("Error editing reply:", err));
       } catch (replyError) {

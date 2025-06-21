@@ -252,7 +252,7 @@ async function handleOrderSubmit(interaction, db) {
       // Add pets field if provided
       if (pets.length > 0) {
          orderEmbed.addFields({
-            name: 'Other Pets',
+            name: 'Pets',
             value: pets.join('\n'),
             inline: false
          });
@@ -315,7 +315,7 @@ async function handleOrderSubmit(interaction, db) {
       }
 
       if (pets.length > 0) {
-         confirmationMessage += `Other Pets: ${pets.join(', ')}\n`;
+         confirmationMessage += `Pets: ${pets.join(', ')}\n`;
       }
 
       if (sheckles.length > 0) {
