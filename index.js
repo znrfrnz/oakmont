@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
-const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, Partials, ActivityType } = require('discord.js');
 require('dotenv').config();
 const updateStockEmbed = require('./utils/updateStockEmbed');
 const updateQueueEmbed = require('./utils/updateQueueEmbed');
@@ -32,8 +32,12 @@ client.once('ready', async () => {
    const guildCount = client.guilds.cache.size;
    const guildNames = client.guilds.cache.map(guild => guild.name).join(', ');
 
-   client.user.setActivity(`Watching ${guildNames}`, { type: 'WATCHING' });
-   console.log(`🎯 Set status: Watching ${guildNames} (${guildCount} server${guildCount !== 1 ? 's' : ''})`);
+   try {
+      client.user.setActivity(`Watching ${guildNames}`, { type: ActivityType.Watching });
+      console.log(`🎯 Set status: Watching ${guildNames} (${guildCount} server${guildCount !== 1 ? 's' : ''})`);
+   } catch (error) {
+      console.error('❌ Error setting bot status:', error);
+   }
 
    // Verify role IDs exist and log them
    const adminRoleId = process.env.ADMIN_ROLE_ID;
