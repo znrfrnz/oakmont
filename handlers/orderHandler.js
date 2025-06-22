@@ -431,9 +431,7 @@ async function handleOrderComplete(interaction, db) {
    }
 
    // Get the order messages to extract details
-   const messages = await channel.messages.fetch({ limit: 10 });
-   console.log('Order completion debug: Found', messages.size, 'messages in channel');
-
+   const messages = await channel.messages.fetch({ limit: 50 });
    const orderMessage = messages.find(m =>
       m.embeds.length > 0 &&
       m.embeds[0].data &&
@@ -441,32 +439,17 @@ async function handleOrderComplete(interaction, db) {
       m.embeds[0].data.title.startsWith('Order #')
    );
 
-   if (!orderMessage) {
-      console.log('Order completion debug: No order message found. Available messages:');
-      messages.forEach((msg, index) => {
-         console.log(`  ${index + 1}. Author: ${msg.author.tag}, Embeds: ${msg.embeds.length}`);
-         if (msg.embeds.length > 0) {
-            console.log(`     Title: ${msg.embeds[0].data?.title || 'No title'}`);
-         }
-      });
-      return await interaction.reply({
-         content: '❌ Could not find order message.',
-         ephemeral: true
-      });
+   let itemFields = [];
+   let warning = '';
+
+   if (!orderMessage || !orderMessage.embeds[0]) {
+      warning = '⚠️ Order embed not found. Completing order anyway. No stock will be updated.';
+   } else {
+      // Extract item and quantity from the embed
+      const orderEmbed = orderMessage.embeds[0];
+      // Extract all item fields (fields with names like '2 x item name')
+      itemFields = orderEmbed.data.fields ? orderEmbed.data.fields.filter(f => /\d+ x .+/i.test(f.name)) : [];
    }
-
-   if (!orderMessage.embeds[0]) {
-      return await interaction.reply({
-         content: '❌ Could not find order embed.',
-         ephemeral: true
-      });
-   }
-
-   // Extract item and quantity from the embed
-   const orderEmbed = orderMessage.embeds[0];
-
-   // Extract all item fields (fields with names like '2 x item name')
-   const itemFields = orderEmbed.data.fields ? orderEmbed.data.fields.filter(f => /\d+ x .+/i.test(f.name)) : [];
 
    // Update the stock in the database for each item (only if there are stock items)
    if (itemFields && itemFields.length > 0) {
@@ -502,7 +485,7 @@ async function handleOrderComplete(interaction, db) {
    // Send completion message
    const completionEmbed = new EmbedBuilder()
       .setTitle('✅ Order Completed')
-      .setDescription(`This order has been completed by ${interaction.user}`)
+      .setDescription(`This order has been completed by ${interaction.user}` + (warning ? `\n\n${warning}` : ''))
       .setColor(0x2ecc71) // Green color
       .setTimestamp();
 
