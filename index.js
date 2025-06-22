@@ -33,7 +33,7 @@ client.once('ready', async () => {
    const guildNames = client.guilds.cache.map(guild => guild.name).join(', ');
 
    try {
-      client.user.setActivity(`Watching ${guildNames}`, { type: ActivityType.Watching });
+      client.user.setActivity(guildNames, { type: ActivityType.Watching });
       console.log(`🎯 Set status: Watching ${guildNames} (${guildCount} server${guildCount !== 1 ? 's' : ''})`);
    } catch (error) {
       console.error('❌ Error setting bot status:', error);
