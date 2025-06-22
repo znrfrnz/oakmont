@@ -8,85 +8,92 @@ const updateQueueEmbed = require('./utils/updateQueueEmbed');
 
 // Create a new Discord client
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMessageReactions,
-    GatewayIntentBits.MessageContent,
-  ],
-  partials: [
-    Partials.User,
-    Partials.Channel,
-    Partials.Message,
-    Partials.Reaction,
-    Partials.GuildMember,
-  ],
+   intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.GuildMessageReactions,
+      GatewayIntentBits.MessageContent,
+   ],
+   partials: [
+      Partials.User,
+      Partials.Channel,
+      Partials.Message,
+      Partials.Reaction,
+      Partials.GuildMember,
+   ],
 });
 
 // Log when ready
 client.once('ready', async () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
+   console.log(`✅ Logged in as ${client.user.tag}`);
 
-  // Verify role IDs exist and log them
-  const adminRoleId = process.env.ADMIN_ROLE_ID;
-  const userRoleId = process.env.USER_ROLE_ID;
+   // Set bot status to show which server it's in
+   const guildCount = client.guilds.cache.size;
+   const guildNames = client.guilds.cache.map(guild => guild.name).join(', ');
 
-  if (adminRoleId) {
-    try {
-      // Try to fetch the role from any guild the bot is in
-      let foundRole = false;
-      for (const guild of client.guilds.cache.values()) {
-        try {
-          const role = await guild.roles.fetch(adminRoleId);
-          if (role) {
-            console.log(`✅ Admin role found: ${role.name} (${role.id})`);
-            foundRole = true;
-            break;
-          }
-        } catch {}
+   client.user.setActivity(`Watching ${guildNames}`, { type: 'WATCHING' });
+   console.log(`🎯 Set status: Watching ${guildNames} (${guildCount} server${guildCount !== 1 ? 's' : ''})`);
+
+   // Verify role IDs exist and log them
+   const adminRoleId = process.env.ADMIN_ROLE_ID;
+   const userRoleId = process.env.USER_ROLE_ID;
+
+   if (adminRoleId) {
+      try {
+         // Try to fetch the role from any guild the bot is in
+         let foundRole = false;
+         for (const guild of client.guilds.cache.values()) {
+            try {
+               const role = await guild.roles.fetch(adminRoleId);
+               if (role) {
+                  console.log(`✅ Admin role found: ${role.name} (${role.id})`);
+                  foundRole = true;
+                  break;
+               }
+            } catch { }
+         }
+         if (!foundRole) console.log(`⚠️ Admin role with ID ${adminRoleId} not found in any guild`);
+      } catch (error) {
+         console.error('Error verifying admin role ID:', error);
       }
-      if (!foundRole) console.log(`⚠️ Admin role with ID ${adminRoleId} not found in any guild`);
-    } catch (error) {
-      console.error('Error verifying admin role ID:', error);
-    }
-  } else {
-    console.log('⚠️ No admin role ID configured in .env');
-  }
+   } else {
+      console.log('⚠️ No admin role ID configured in .env');
+   }
 
-  if (userRoleId) {
-    try {
-      // Try to fetch the role from any guild the bot is in
-      let foundRole = false;
-      for (const guild of client.guilds.cache.values()) {
-        try {
-          const role = await guild.roles.fetch(userRoleId);
-          if (role) {
-            console.log(`✅ User role found: ${role.name} (${role.id})`);
-            foundRole = true;
-            break;
-          }
-        } catch {}
+   if (userRoleId) {
+      try {
+         // Try to fetch the role from any guild the bot is in
+         let foundRole = false;
+         for (const guild of client.guilds.cache.values()) {
+            try {
+               const role = await guild.roles.fetch(userRoleId);
+               if (role) {
+                  console.log(`✅ User role found: ${role.name} (${role.id})`);
+                  foundRole = true;
+                  break;
+               }
+            } catch { }
+         }
+         if (!foundRole) console.log(`⚠️ User role with ID ${userRoleId} not found in any guild`);
+      } catch (error) {
+         console.error('Error verifying user role ID:', error);
       }
-      if (!foundRole) console.log(`⚠️ User role with ID ${userRoleId} not found in any guild`);
-    } catch (error) {
-      console.error('Error verifying user role ID:', error);
-    }
-  } else {
-    console.log('⚠️ No user role ID configured in .env');
-  }
+   } else {
+      console.log('⚠️ No user role ID configured in .env');
+   }
 
-  // Initialize the queue display
-  updateQueueEmbed(client);
+   // Initialize the queue display
+   updateQueueEmbed(client);
 
-  // Set up automatic queue updates
-  setInterval(() => {
-    updateQueueEmbed(client);
-  }, 5 * 60 * 1000); // 5 minutes
+   // Set up automatic queue updates
+   setInterval(() => {
+      updateQueueEmbed(client);
+   }, 5 * 60 * 1000); // 5 minutes
 
-  // Update the FAQ embed
-  const updateFaqEmbed = require('./utils/updateFaqEmbed');
-  await updateFaqEmbed(client, db).catch(console.error);
+   // Update the FAQ embed
+   const updateFaqEmbed = require('./utils/updateFaqEmbed');
+   await updateFaqEmbed(client, db).catch(console.error);
 });
 
 // Initialize command collection
@@ -118,11 +125,11 @@ db.run(`CREATE TABLE IF NOT EXISTS faq (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )`, (err) => {
-  if (err) {
-    console.error('Error creating FAQ table:', err);
-  } else {
-    console.log('FAQ table created or already exists');
-  }
+   if (err) {
+      console.error('Error creating FAQ table:', err);
+   } else {
+      console.log('FAQ table created or already exists');
+   }
 });
 
 // Make the database available to all parts of the bot
@@ -130,16 +137,16 @@ client.db = db;
 
 // Modify the command registration loop to pass db
 for (const file of commandFiles) {
-  const filePath = path.join(commandsPath, file);
-  const command = require(filePath);
+   const filePath = path.join(commandsPath, file);
+   const command = require(filePath);
 
-  if ('data' in command && 'execute' in command) {
-    // Add the db to the command object so it's accessible
-    command.db = db;
-    client.commands.set(command.data.name, command);
-  } else {
-    console.warn(`[⚠️] The command at ${filePath} is missing "data" or "execute".`);
-  }
+   if ('data' in command && 'execute' in command) {
+      // Add the db to the command object so it's accessible
+      command.db = db;
+      client.commands.set(command.data.name, command);
+   } else {
+      console.warn(`[⚠️] The command at ${filePath} is missing "data" or "execute".`);
+   }
 }
 
 // Load all events from /events
@@ -147,14 +154,14 @@ const eventsPath = path.join(__dirname, 'events');
 const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
 for (const file of eventFiles) {
-  const filePath = path.join(eventsPath, file);
-  const event = require(filePath);
+   const filePath = path.join(eventsPath, file);
+   const event = require(filePath);
 
-  if (event.once) {
-    client.once(event.name, (...args) => event.execute(...args));
-  } else {
-    client.on(event.name, (...args) => event.execute(...args));
-  }
+   if (event.once) {
+      client.once(event.name, (...args) => event.execute(...args));
+   } else {
+      client.on(event.name, (...args) => event.execute(...args));
+   }
 }
 
 // Log in the bot
