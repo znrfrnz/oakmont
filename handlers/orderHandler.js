@@ -101,41 +101,87 @@ async function handleOrderSubmit(interaction, db) {
       });
       const stockNames = allItems.map(i => i.name.toLowerCase());
 
+      console.log('Order creation debug: Raw input:', itemsRaw);
+      console.log('Order creation debug: Available stock items:', stockNames);
+
+      // Process each line
       for (const line of lines) {
-         // Sheckles
-         if (line.toLowerCase().includes('sheckle')) {
-            sheckles.push(line);
-            continue;
-         }
-         // Try to match as item (number + item name)
-         const itemMatch = line.match(/^([0-9]+)\s+(.+)$/);
-         if (itemMatch) {
-            const itemName = itemMatch[2].trim();
-            const quantity = parseInt(itemMatch[1], 10);
+         console.log('Order creation debug: Processing line:', line);
+         // Split by commas and process each part
+         const parts = line.split(',').map(part => part.trim()).filter(part => part.length > 0);
+         console.log('Order creation debug: Split parts:', parts);
 
-            // First try exact match (case-insensitive)
-            let stockIndex = stockNames.indexOf(itemName.toLowerCase());
+         for (const part of parts) {
+            console.log('Order creation debug: Processing part:', part);
+            // Remove common filler words and clean up the text
+            let cleanedPart = part.toLowerCase()
+               .replace(/\b(need|want|get|please|if you have|if u got|if available)\b/g, '')
+               .replace(/\band\b/g, '')
+               .trim();
 
-            // If no exact match, try fuzzy matching
-            if (stockIndex === -1) {
-               const bestMatch = findBestMatch(itemName, allItems);
-               if (bestMatch && bestMatch.score >= 70) { // Minimum similarity threshold
-                  stockIndex = allItems.findIndex(i => i.name === bestMatch.item.name);
+            console.log('Order creation debug: Cleaned part:', cleanedPart);
+
+            // Skip empty parts
+            if (!cleanedPart) continue;
+
+            // Sheckles detection
+            if (cleanedPart.includes('sheckle')) {
+               sheckles.push(part.trim());
+               console.log('Order creation debug: Added to sheckles:', part.trim());
+               continue;
+            }
+
+            // Try to match as item with various patterns
+            // Pattern 1: "1 queen bee" or "1queen bee"
+            let itemMatch = cleanedPart.match(/^(\d+)\s*([a-zA-Z\s]+)$/);
+
+            // Pattern 2: "queen bee" (assume quantity 1)
+            if (!itemMatch) {
+               itemMatch = cleanedPart.match(/^([a-zA-Z\s]+)$/);
+               if (itemMatch) {
+                  itemMatch = [null, '1', itemMatch[1]];
                }
             }
 
-            if (stockIndex !== -1) {
-               items.push({
-                  name: allItems[stockIndex].name,
-                  quantity: quantity,
-                  price: allItems[stockIndex].price
-               });
-               continue;
+            console.log('Order creation debug: Item match result:', itemMatch);
+
+            if (itemMatch) {
+               const itemName = itemMatch[2].trim();
+               const quantity = parseInt(itemMatch[1], 10);
+               console.log('Order creation debug: Attempting to match item:', itemName, 'quantity:', quantity);
+
+               // First try exact match (case-insensitive)
+               let stockIndex = stockNames.indexOf(itemName.toLowerCase());
+
+               // If no exact match, try fuzzy matching
+               if (stockIndex === -1) {
+                  const bestMatch = findBestMatch(itemName, allItems);
+                  if (bestMatch && bestMatch.score >= 70) { // Minimum similarity threshold
+                     stockIndex = allItems.findIndex(i => i.name === bestMatch.item.name);
+                     console.log(`Order creation debug: Fuzzy matched "${itemName}" to "${bestMatch.item.name}" (score: ${bestMatch.score})`);
+                  }
+               }
+
+               if (stockIndex !== -1) {
+                  items.push({
+                     name: allItems[stockIndex].name,
+                     quantity: quantity,
+                     price: allItems[stockIndex].price
+                  });
+                  console.log('Order creation debug: Added item:', allItems[stockIndex].name);
+                  continue;
+               }
             }
+
+            // If not matched as stock item, treat as pet
+            pets.push(part.trim());
+            console.log('Order creation debug: Added to pets:', part.trim());
          }
-         // If not a stock item and not sheckles, treat as pet
-         pets.push(line);
       }
+
+      console.log('Order creation debug: Final items:', items);
+      console.log('Order creation debug: Final pets:', pets);
+      console.log('Order creation debug: Final sheckles:', sheckles);
 
       if (items.length === 0 && pets.length === 0 && sheckles.length === 0) {
          return await interaction.editReply({
@@ -386,6 +432,8 @@ async function handleOrderComplete(interaction, db) {
 
    // Get the order messages to extract details
    const messages = await channel.messages.fetch({ limit: 10 });
+   console.log('Order completion debug: Found', messages.size, 'messages in channel');
+
    const orderMessage = messages.find(m =>
       m.embeds.length > 0 &&
       m.embeds[0].data &&
@@ -394,6 +442,13 @@ async function handleOrderComplete(interaction, db) {
    );
 
    if (!orderMessage) {
+      console.log('Order completion debug: No order message found. Available messages:');
+      messages.forEach((msg, index) => {
+         console.log(`  ${index + 1}. Author: ${msg.author.tag}, Embeds: ${msg.embeds.length}`);
+         if (msg.embeds.length > 0) {
+            console.log(`     Title: ${msg.embeds[0].data?.title || 'No title'}`);
+         }
+      });
       return await interaction.reply({
          content: '❌ Could not find order message.',
          ephemeral: true
