@@ -136,6 +136,26 @@ module.exports = {
          subcommand
             .setName('list')
             .setDescription('List all items in stock')
+      )
+      .addSubcommand(subcommand =>
+         subcommand
+            .setName('edit')
+            .setDescription('Edit an existing item in stock')
+            .addStringOption(option =>
+               option.setName('name')
+                  .setDescription('Item name to edit')
+                  .setRequired(true)
+            )
+            .addNumberOption(option =>
+               option.setName('price')
+                  .setDescription('New price (leave empty to keep current)')
+                  .setMinValue(0)
+            )
+            .addIntegerOption(option =>
+               option.setName('quantity')
+                  .setDescription('New quantity (leave empty to keep current)')
+                  .setMinValue(0)
+            )
       ),
 
    async execute(interaction, db) {
@@ -288,6 +308,113 @@ module.exports = {
             } catch (error) {
                console.error('Error listing items:', error);
                await interaction.editReply('❌ Error listing stock items.');
+            }
+            break;
+
+         case 'edit':
+            await interaction.deferReply({ ephemeral: true });
+            try {
+               const searchTerm = interaction.options.getString('name');
+               const newPrice = interaction.options.getNumber('price');
+               const newQuantity = interaction.options.getInteger('quantity');
+
+               // Check if at least one field is provided
+               if (newPrice === null && newQuantity === null) {
+                  await interaction.editReply('❌ Please provide at least one field to edit (price or quantity).');
+                  return;
+               }
+
+               // Get all items for smart matching
+               const allItems = await new Promise((resolve, reject) => {
+                  db.all('SELECT * FROM stock ORDER BY name ASC', (err, rows) => {
+                     if (err) reject(err);
+                     else resolve(rows || []);
+                  });
+               });
+
+               if (allItems.length === 0) {
+                  await interaction.editReply('📦 No items in stock to edit.');
+                  return;
+               }
+
+               // Find the best match
+               const match = findBestMatch(searchTerm, allItems);
+
+               if (!match || match.score < 70) {
+                  const suggestions = allItems
+                     .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                     .slice(0, 5)
+                     .map(item => `• ${item.name}`)
+                     .join('\n');
+
+                  await interaction.editReply(
+                     `❌ Item **"${searchTerm}"** not found.\n\n` +
+                     (suggestions ? `**Did you mean:**\n${suggestions}` : '**Available items:**\n' + allItems.map(item => `• ${item.name}`).join('\n'))
+                  );
+                  return;
+               }
+
+               const matchedItem = match.item;
+
+               // If it's not an exact match, ask for confirmation
+               if (match.type !== 'exact') {
+                  const confirmationMessage =
+                     `🔍 **Smart Match Found:**\n` +
+                     `You searched for: **"${searchTerm}"**\n` +
+                     `Matched to: **"${matchedItem.name}"**\n` +
+                     `Match type: **${match.type}** (${Math.round(match.score)}% confidence)\n\n` +
+                     `💰 Current Price: **$${matchedItem.price.toLocaleString()}**\n` +
+                     `📦 Current Quantity: **${matchedItem.quantity}**\n\n` +
+                     `Are you sure you want to edit this item? Use \`/stock edit name:"${matchedItem.name}"\` to confirm.`;
+
+                  const row = new ActionRowBuilder().addComponents(
+                     new ButtonBuilder()
+                        .setCustomId('stock_edit_confirm')
+                        .setLabel('Yes')
+                        .setStyle(ButtonStyle.Success),
+                     new ButtonBuilder()
+                        .setCustomId('stock_edit_cancel')
+                        .setLabel('No')
+                        .setStyle(ButtonStyle.Danger)
+                  );
+
+                  await interaction.editReply({ content: confirmationMessage, components: [row] });
+                  return;
+               }
+
+               // Exact match - proceed with editing
+               const finalPrice = newPrice !== null ? newPrice : matchedItem.price;
+               const finalQuantity = newQuantity !== null ? newQuantity : matchedItem.quantity;
+
+               const result = await new Promise((resolve, reject) => {
+                  db.run(
+                     'UPDATE stock SET price = ?, quantity = ? WHERE name = ?',
+                     [finalPrice, finalQuantity, matchedItem.name],
+                     function (err) {
+                        if (err) reject(err);
+                        else resolve(this.changes);
+                     }
+                  );
+               });
+
+               if (result > 0) {
+                  await updateStockEmbed(interaction.client, db);
+
+                  let editMessage = `✅ Updated **${matchedItem.name}**:\n`;
+                  if (newPrice !== null) {
+                     editMessage += `💰 Price: $${matchedItem.price.toLocaleString()} → **$${finalPrice.toLocaleString()}**\n`;
+                  }
+                  if (newQuantity !== null) {
+                     editMessage += `📦 Quantity: ${matchedItem.quantity} → **${finalQuantity}**\n`;
+                  }
+
+                  await interaction.editReply(editMessage);
+               } else {
+                  await interaction.editReply(`❌ Item **${matchedItem.name}** not found in stock.`);
+               }
+            } catch (error) {
+               console.error('Error editing item:', error);
+               await interaction.editReply('❌ Error editing item in stock.');
             }
             break;
       }

@@ -193,6 +193,41 @@ module.exports = {
             return;
          }
 
+         // Handle stock edit confirmation buttons
+         if (interaction.customId === 'stock_edit_confirm') {
+            // Get the original search term and matched item from the message content
+            const messageContent = interaction.message.content;
+            const searchMatch = messageContent.match(/You searched for: \*\*"([^"]+)"\*\*/);
+            const matchedItemMatch = messageContent.match(/Matched to: \*\*"([^"]+)"\*\*/);
+
+            if (searchMatch && matchedItemMatch) {
+               const searchTerm = searchMatch[1];
+               const matchedItemName = matchedItemMatch[1];
+
+               // For edit confirmation, we need to get the original command interaction
+               // Since we can't easily get the original options, we'll show a message
+               // asking the user to use the exact command
+               await interaction.update({
+                  content: `✅ Confirmed! Please use \`/stock edit name:"${matchedItemName}"\` with your desired price and/or quantity values to complete the edit.`,
+                  components: []
+               });
+            } else {
+               await interaction.update({
+                  content: '❌ Error: Could not process edit confirmation.',
+                  components: []
+               });
+            }
+            return;
+         }
+
+         if (interaction.customId === 'stock_edit_cancel') {
+            await interaction.update({
+               content: '❌ Stock edit cancelled.',
+               components: []
+            });
+            return;
+         }
+
          // Handle any other buttons you have...
       }
 
