@@ -111,12 +111,23 @@ async function handleOrderSubmit(interaction, db) {
          const itemMatch = line.match(/^([0-9]+)\s+(.+)$/);
          if (itemMatch) {
             const itemName = itemMatch[2].trim();
-            // Only treat as item if it matches a stock item
-            const stockIndex = stockNames.indexOf(itemName.toLowerCase());
+            const quantity = parseInt(itemMatch[1], 10);
+
+            // First try exact match (case-insensitive)
+            let stockIndex = stockNames.indexOf(itemName.toLowerCase());
+
+            // If no exact match, try fuzzy matching
+            if (stockIndex === -1) {
+               const bestMatch = findBestMatch(itemName, allItems);
+               if (bestMatch && bestMatch.score >= 70) { // Minimum similarity threshold
+                  stockIndex = allItems.findIndex(i => i.name === bestMatch.item.name);
+               }
+            }
+
             if (stockIndex !== -1) {
                items.push({
                   name: allItems[stockIndex].name,
-                  quantity: parseInt(itemMatch[1], 10),
+                  quantity: quantity,
                   price: allItems[stockIndex].price
                });
                continue;
@@ -382,9 +393,16 @@ async function handleOrderComplete(interaction, db) {
       m.embeds[0].data.title.startsWith('Order #')
    );
 
-   if (!orderMessage || !orderMessage.embeds[0]) {
+   if (!orderMessage) {
       return await interaction.reply({
-         content: '❌ Could not find order details.',
+         content: '❌ Could not find order message.',
+         ephemeral: true
+      });
+   }
+
+   if (!orderMessage.embeds[0]) {
+      return await interaction.reply({
+         content: '❌ Could not find order embed.',
          ephemeral: true
       });
    }
