@@ -139,6 +139,20 @@ module.exports = {
             return;
          }
 
+         // Handle ticket claim button
+         if (interaction.customId === 'claim_ticket') {
+            const { claimTicket } = require('../utils/ticketUtils');
+            await claimTicket(interaction);
+            return;
+         }
+
+         // Handle ticket unclaim button
+         if (interaction.customId === 'unclaim_ticket') {
+            const { unclaimTicket } = require('../utils/ticketUtils');
+            await unclaimTicket(interaction);
+            return;
+         }
+
          // Handle ticket completion button
          if (interaction.customId === 'ticket_complete') {
             await handleTicketComplete(interaction);
@@ -415,7 +429,12 @@ module.exports = {
                   .setCustomId('ticket_close')
                   .setLabel('Close Ticket')
                   .setEmoji('❌')
-                  .setStyle(ButtonStyle.Danger)
+                  .setStyle(ButtonStyle.Danger),
+               new ButtonBuilder()
+                  .setCustomId('claim_ticket')
+                  .setLabel('Claim Ticket')
+                  .setEmoji('🎯')
+                  .setStyle(ButtonStyle.Primary)
             );
 
          // Send the ticket details to the new channel
@@ -765,7 +784,12 @@ async function handleTicketModalSubmit(interaction) {
                .setCustomId('ticket_close')
                .setLabel('Close Ticket')
                .setEmoji('❌')
-               .setStyle(ButtonStyle.Danger)
+               .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+               .setCustomId('claim_ticket')
+               .setLabel('Claim Ticket')
+               .setEmoji('��')
+               .setStyle(ButtonStyle.Primary)
          );
 
       // Send the ticket details to the new channel
@@ -939,7 +963,12 @@ async function handleRobloxDevTicketModalSubmit(interaction) {
                .setCustomId('ticket_close')
                .setLabel('Close Ticket')
                .setEmoji('❌')
-               .setStyle(ButtonStyle.Danger)
+               .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+               .setCustomId('claim_ticket')
+               .setLabel('Claim Ticket')
+               .setEmoji('🎯')
+               .setStyle(ButtonStyle.Primary)
          );
 
       // Send the ticket details to the new channel

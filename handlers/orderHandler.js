@@ -297,7 +297,12 @@ async function handleOrderSubmit(interaction, db) {
                .setCustomId('order_cancel')
                .setLabel('Cancel Order')
                .setEmoji('❌')
-               .setStyle(ButtonStyle.Danger)
+               .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+               .setCustomId('claim_ticket')
+               .setLabel('Claim Ticket')
+               .setEmoji('🎯')
+               .setStyle(ButtonStyle.Primary)
          );
 
       await orderChannel.send({
@@ -377,7 +382,7 @@ async function handleOrderComplete(interaction, db) {
       m.embeds[0].data.title.startsWith('Order #')
    );
 
-   if (!orderMessage || !orderMessage.embeds[0] || !orderMessage.embeds[0].data.fields) {
+   if (!orderMessage || !orderMessage.embeds[0]) {
       return await interaction.reply({
          content: '❌ Could not find order details.',
          ephemeral: true
@@ -388,41 +393,37 @@ async function handleOrderComplete(interaction, db) {
    const orderEmbed = orderMessage.embeds[0];
 
    // Extract all item fields (fields with names like '2 x item name')
-   const itemFields = orderEmbed.data.fields.filter(f => /\d+ x .+/i.test(f.name));
-   if (!itemFields || itemFields.length === 0) {
-      return await interaction.reply({
-         content: '❌ Could not find item details in the order.',
-         ephemeral: true
-      });
-   }
+   const itemFields = orderEmbed.data.fields ? orderEmbed.data.fields.filter(f => /\d+ x .+/i.test(f.name)) : [];
 
-   // Update the stock in the database for each item
-   try {
-      for (const field of itemFields) {
-         // Parse quantity and item name from field.name (e.g., '2 x item name')
-         const match = field.name.match(/(\d+) x (.+)/i);
-         if (!match) continue;
-         const quantity = parseInt(match[1], 10);
-         const item = match[2].trim();
-         if (isNaN(quantity) || !item) continue;
-         await new Promise((resolve, reject) => {
-            db.run(
-               `UPDATE stock SET quantity = quantity - ? WHERE LOWER(name) = LOWER(?)`,
-               [quantity, item],
-               function (err) {
-                  if (err) reject(err);
-                  else if (this.changes === 0) reject(new Error(`Item not found or no changes made for ${item}`));
-                  else resolve(this.changes);
-               }
-            );
+   // Update the stock in the database for each item (only if there are stock items)
+   if (itemFields && itemFields.length > 0) {
+      try {
+         for (const field of itemFields) {
+            // Parse quantity and item name from field.name (e.g., '2 x item name')
+            const match = field.name.match(/(\d+) x (.+)/i);
+            if (!match) continue;
+            const quantity = parseInt(match[1], 10);
+            const item = match[2].trim();
+            if (isNaN(quantity) || !item) continue;
+            await new Promise((resolve, reject) => {
+               db.run(
+                  `UPDATE stock SET quantity = quantity - ? WHERE LOWER(name) = LOWER(?)`,
+                  [quantity, item],
+                  function (err) {
+                     if (err) reject(err);
+                     else if (this.changes === 0) reject(new Error(`Item not found or no changes made for ${item}`));
+                     else resolve(this.changes);
+                  }
+               );
+            });
+         }
+      } catch (dbError) {
+         console.error('Database error:', dbError);
+         return await interaction.reply({
+            content: `❌ Failed to update inventory. ${dbError.message}`,
+            ephemeral: true
          });
       }
-   } catch (dbError) {
-      console.error('Database error:', dbError);
-      return await interaction.reply({
-         content: `❌ Failed to update inventory. ${dbError.message}`,
-         ephemeral: true
-      });
    }
 
    // Send completion message

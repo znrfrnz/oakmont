@@ -330,7 +330,12 @@ async function markAsProcessing(interaction) {
                .setCustomId('ticket_unprocess')
                .setLabel('Unmark Processing')
                .setEmoji('⏹️')
-               .setStyle(ButtonStyle.Secondary)
+               .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+               .setCustomId('claim_ticket')
+               .setLabel('Claim Ticket')
+               .setEmoji('🎯')
+               .setStyle(ButtonStyle.Primary)
          );
       } else {
          // Support ticket buttons (including roblox-dev-)
@@ -349,7 +354,12 @@ async function markAsProcessing(interaction) {
                .setCustomId('ticket_unprocess')
                .setLabel('Unmark Processing')
                .setEmoji('⏹️')
-               .setStyle(ButtonStyle.Secondary)
+               .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+               .setCustomId('claim_ticket')
+               .setLabel('Claim Ticket')
+               .setEmoji('🎯')
+               .setStyle(ButtonStyle.Primary)
          );
       }
 
@@ -505,6 +515,11 @@ async function unmarkProcessing(interaction) {
                .setCustomId('ticket_process')
                .setLabel('Mark as Processing')
                .setEmoji('⚙️')
+               .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+               .setCustomId('claim_ticket')
+               .setLabel('Claim Ticket')
+               .setEmoji('🎯')
                .setStyle(ButtonStyle.Primary)
          );
       } else {
@@ -524,6 +539,11 @@ async function unmarkProcessing(interaction) {
                .setCustomId('ticket_process')
                .setLabel('Mark as Processing')
                .setEmoji('⚙️')
+               .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+               .setCustomId('claim_ticket')
+               .setLabel('Claim Ticket')
+               .setEmoji('🎯')
                .setStyle(ButtonStyle.Primary)
          );
       }
@@ -542,10 +562,295 @@ async function unmarkProcessing(interaction) {
    }
 }
 
+/**
+ * Claims a ticket for a staff member
+ * @param {Interaction} interaction - The button interaction
+ */
+async function claimTicket(interaction) {
+   const channel = interaction.channel;
+
+   // Check if this is a ticket or order channel
+   if (!channel.name.toLowerCase().includes('ticket-') &&
+      !channel.name.toLowerCase().includes('support-') &&
+      !channel.name.toLowerCase().includes('order-') &&
+      !channel.name.toLowerCase().includes('roblox-dev-')) {
+      return interaction.reply({
+         content: '❌ This command can only be used in ticket or order channels',
+         ephemeral: true
+      });
+   }
+
+   // Check if user has permission (Den Lords only)
+   const isDenLord = interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) ||
+      interaction.member.roles.cache.some(r => r.name.toLowerCase() === 'den lord');
+
+   if (!isDenLord) {
+      return interaction.reply({
+         content: '❌ Only Den Lords can claim tickets',
+         ephemeral: true
+      });
+   }
+
+   try {
+      // Check if ticket is already claimed
+      const existingClaim = channel.topic?.includes('CLAIMED BY:');
+      if (existingClaim) {
+         return interaction.reply({
+            content: '❌ This ticket is already claimed by another staff member',
+            ephemeral: true
+         });
+      }
+
+      // Update channel topic to include claim information
+      const originalTopic = channel.topic || '';
+      const newTopic = originalTopic + ` | CLAIMED BY: ${interaction.user.id}`;
+
+      await channel.setTopic(newTopic);
+
+      // Create claim embed
+      const claimEmbed = new EmbedBuilder()
+         .setTitle('🎯 Ticket Claimed')
+         .setDescription(`This ${channel.name.startsWith('order-') ? 'order' : 'ticket'} has been claimed by ${interaction.user}`)
+         .setColor(0x27ae60) // Green color
+         .setTimestamp();
+
+      // Create new action row with updated buttons
+      const actionRow = new ActionRowBuilder();
+
+      if (channel.name.startsWith('order-')) {
+         // Order buttons with claim status
+         actionRow.addComponents(
+            new ButtonBuilder()
+               .setCustomId('order_complete')
+               .setLabel('Complete Order')
+               .setEmoji('✅')
+               .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+               .setCustomId('order_unprocess')
+               .setLabel('Unmark Processing')
+               .setEmoji('⏹️')
+               .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+               .setCustomId('unclaim_ticket')
+               .setLabel('Unclaim')
+               .setEmoji('🔓')
+               .setStyle(ButtonStyle.Secondary)
+         );
+      } else {
+         // Support ticket buttons with claim status
+         actionRow.addComponents(
+            new ButtonBuilder()
+               .setCustomId('ticket_complete')
+               .setLabel('Complete Ticket')
+               .setEmoji('✅')
+               .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+               .setCustomId('ticket_close')
+               .setLabel('Close Ticket')
+               .setEmoji('🔒')
+               .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+               .setCustomId('ticket_unprocess')
+               .setLabel('Unmark Processing')
+               .setEmoji('⏹️')
+               .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+               .setCustomId('unclaim_ticket')
+               .setLabel('Unclaim')
+               .setEmoji('🔓')
+               .setStyle(ButtonStyle.Secondary)
+         );
+      }
+
+      // Send claim notification
+      await interaction.reply({
+         embeds: [claimEmbed],
+         components: [actionRow]
+      });
+
+      // Log to ticket logs if configured
+      const logsChannelId = process.env.TICKETS_LOGS_CHANNEL;
+      if (logsChannelId) {
+         try {
+            const logsChannel = await interaction.client.channels.fetch(logsChannelId);
+            if (logsChannel) {
+               const logEmbed = new EmbedBuilder()
+                  .setTitle(channel.name.startsWith('order-') ? 'Order Claimed' : 'Ticket Claimed')
+                  .setDescription(`**Channel:** #${channel.name}\n**Claimed by:** ${interaction.user.tag}`)
+                  .setColor(0x27ae60)
+                  .setTimestamp();
+
+               await logsChannel.send({ embeds: [logEmbed] });
+            }
+         } catch (err) {
+            console.error('Error sending to logs channel:', err);
+         }
+      }
+
+   } catch (error) {
+      console.error('Error claiming ticket:', error);
+      await interaction.reply({
+         content: '❌ An error occurred while claiming the ticket',
+         ephemeral: true
+      });
+   }
+}
+
+/**
+ * Unclaims a ticket
+ * @param {Interaction} interaction - The button interaction
+ */
+async function unclaimTicket(interaction) {
+   const channel = interaction.channel;
+
+   // Check if this is a ticket or order channel
+   if (!channel.name.toLowerCase().includes('ticket-') &&
+      !channel.name.toLowerCase().includes('support-') &&
+      !channel.name.toLowerCase().includes('order-') &&
+      !channel.name.toLowerCase().includes('roblox-dev-')) {
+      return interaction.reply({
+         content: '❌ This command can only be used in ticket or order channels',
+         ephemeral: true
+      });
+   }
+
+   // Check if user has permission (Den Lords only)
+   const isDenLord = interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) ||
+      interaction.member.roles.cache.some(r => r.name.toLowerCase() === 'den lord');
+
+   if (!isDenLord) {
+      return interaction.reply({
+         content: '❌ Only Den Lords can unclaim tickets',
+         ephemeral: true
+      });
+   }
+
+   try {
+      // Check if ticket is claimed and by whom
+      const topic = channel.topic || '';
+      const claimMatch = topic.match(/CLAIMED BY: (\d+)/);
+
+      if (!claimMatch) {
+         return interaction.reply({
+            content: '❌ This ticket is not currently claimed',
+            ephemeral: true
+         });
+      }
+
+      const claimedByUserId = claimMatch[1];
+
+      // Only the person who claimed it or an admin can unclaim it
+      const adminRoleId = process.env.ADMIN_ROLE_ID;
+      const isAdmin = adminRoleId && interaction.member.roles.cache.some(role =>
+         role.id === adminRoleId
+      );
+
+      if (claimedByUserId !== interaction.user.id && !isAdmin) {
+         return interaction.reply({
+            content: '❌ Only the person who claimed this ticket or an admin can unclaim it',
+            ephemeral: true
+         });
+      }
+
+      // Remove claim from channel topic
+      const newTopic = topic.replace(/ \| CLAIMED BY: \d+/, '');
+      await channel.setTopic(newTopic);
+
+      // Create unclaim embed
+      const unclaimEmbed = new EmbedBuilder()
+         .setTitle('🔓 Ticket Unclaimed')
+         .setDescription(`This ${channel.name.startsWith('order-') ? 'order' : 'ticket'} has been unclaimed by ${interaction.user}`)
+         .setColor(0x95a5a6) // Gray color
+         .setTimestamp();
+
+      // Create new action row with original buttons
+      const actionRow = new ActionRowBuilder();
+
+      if (channel.name.startsWith('order-')) {
+         // Order buttons without claim
+         actionRow.addComponents(
+            new ButtonBuilder()
+               .setCustomId('order_complete')
+               .setLabel('Complete Order')
+               .setEmoji('✅')
+               .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+               .setCustomId('order_unprocess')
+               .setLabel('Unmark Processing')
+               .setEmoji('⏹️')
+               .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+               .setCustomId('claim_ticket')
+               .setLabel('Claim Ticket')
+               .setEmoji('🎯')
+               .setStyle(ButtonStyle.Primary)
+         );
+      } else {
+         // Support ticket buttons without claim
+         actionRow.addComponents(
+            new ButtonBuilder()
+               .setCustomId('ticket_complete')
+               .setLabel('Complete Ticket')
+               .setEmoji('✅')
+               .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+               .setCustomId('ticket_close')
+               .setLabel('Close Ticket')
+               .setEmoji('🔒')
+               .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+               .setCustomId('ticket_unprocess')
+               .setLabel('Unmark Processing')
+               .setEmoji('⏹️')
+               .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+               .setCustomId('claim_ticket')
+               .setLabel('Claim Ticket')
+               .setEmoji('🎯')
+               .setStyle(ButtonStyle.Primary)
+         );
+      }
+
+      // Send unclaim notification
+      await interaction.reply({
+         embeds: [unclaimEmbed],
+         components: [actionRow]
+      });
+
+      // Log to ticket logs if configured
+      const logsChannelId = process.env.TICKETS_LOGS_CHANNEL;
+      if (logsChannelId) {
+         try {
+            const logsChannel = await interaction.client.channels.fetch(logsChannelId);
+            if (logsChannel) {
+               const logEmbed = new EmbedBuilder()
+                  .setTitle(channel.name.startsWith('order-') ? 'Order Unclaimed' : 'Ticket Unclaimed')
+                  .setDescription(`**Channel:** #${channel.name}\n**Unclaimed by:** ${interaction.user.tag}`)
+                  .setColor(0x95a5a6)
+                  .setTimestamp();
+
+               await logsChannel.send({ embeds: [logEmbed] });
+            }
+         } catch (err) {
+            console.error('Error sending to logs channel:', err);
+         }
+      }
+
+   } catch (error) {
+      console.error('Error unclaiming ticket:', error);
+      await interaction.reply({
+         content: '❌ An error occurred while unclaiming the ticket',
+         ephemeral: true
+      });
+   }
+}
+
 module.exports = {
    sendCloseConfirmation,
    handleTicketClose,
    createTranscript,
    markAsProcessing,
-   unmarkProcessing
+   unmarkProcessing,
+   claimTicket,
+   unclaimTicket
 };
