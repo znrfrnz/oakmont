@@ -2,6 +2,7 @@
 const { ChannelType, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const updateQueueEmbed = require('../utils/updateQueueEmbed');
 const updateStockEmbed = require('../utils/updateStockEmbed');
+const { getPaymentMethodsEmbed } = require('../utils/paymentMethods');
 
 // Smart matching utilities
 function levenshteinDistance(str1, str2) {
@@ -685,11 +686,59 @@ async function handleOrderCancelConfirm(interaction) {
    await updateQueueEmbed(interaction.client);
 }
 
+async function showPaymentMethods(interaction, db) {
+   try {
+      const channel = interaction.channel;
+
+      // Check if order is claimed by someone
+      const topic = channel.topic || '';
+      const claimMatch = topic.match(/CLAIMED BY: (\d+)/);
+
+      let paymentMethodsEmbed;
+      if (claimMatch) {
+         // Show payment methods for the admin who claimed the order
+         const claimedByAdminId = claimMatch[1];
+         paymentMethodsEmbed = await getPaymentMethodsEmbed(db, claimedByAdminId);
+
+         if (!paymentMethodsEmbed) {
+            await interaction.reply({
+               content: `📋 No payment methods configured for the admin who claimed this order.`,
+               ephemeral: true
+            });
+            return;
+         }
+
+         // Update the embed title to show it's for the specific admin
+         paymentMethodsEmbed.setTitle(`💳 Payment Methods - ${interaction.client.users.cache.get(claimedByAdminId)?.username || 'Admin'}`);
+      } else {
+         // Show all payment methods from all admins
+         paymentMethodsEmbed = await getPaymentMethodsEmbed(db);
+
+         if (!paymentMethodsEmbed) {
+            await interaction.reply({
+               content: '📋 No payment methods configured by any admin. Use `/mop add` to add payment methods.',
+               ephemeral: true
+            });
+            return;
+         }
+      }
+
+      await interaction.reply({ embeds: [paymentMethodsEmbed] });
+   } catch (error) {
+      console.error('Error showing payment methods:', error);
+      await interaction.reply({
+         content: '❌ Error displaying payment methods. Please try again.',
+         ephemeral: true
+      });
+   }
+}
+
 module.exports = {
    handleOrderSubmit,
    handleOrderComplete,
    handleOrderCancel,
    handleOrderCancelConfirm,
+   showPaymentMethods,
    levenshteinDistance,
    calculateSimilarity,
    isAcronym,

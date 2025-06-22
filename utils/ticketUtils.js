@@ -337,6 +337,22 @@ async function markAsProcessing(interaction) {
                .setEmoji('🎯')
                .setStyle(ButtonStyle.Primary)
          );
+
+         // Add payment methods button for orders
+         const paymentButtonRow = new ActionRowBuilder()
+            .addComponents(
+               new ButtonBuilder()
+                  .setCustomId('show_order_payment_methods')
+                  .setLabel('Payment Methods')
+                  .setEmoji('💳')
+                  .setStyle(ButtonStyle.Secondary)
+            );
+
+         // Send processing notification with payment methods button
+         await interaction.reply({
+            embeds: [processingEmbed],
+            components: [actionRow, paymentButtonRow]
+         });
       } else {
          // Support ticket buttons (including roblox-dev-)
          actionRow.addComponents(
@@ -361,13 +377,23 @@ async function markAsProcessing(interaction) {
                .setEmoji('🎯')
                .setStyle(ButtonStyle.Primary)
          );
-      }
 
-      // Send processing notification
-      await interaction.reply({
-         embeds: [processingEmbed],
-         components: [actionRow]
-      });
+         // Add payment methods button for tickets
+         const paymentButtonRow = new ActionRowBuilder()
+            .addComponents(
+               new ButtonBuilder()
+                  .setCustomId('show_payment_methods')
+                  .setLabel('Payment Methods')
+                  .setEmoji('💳')
+                  .setStyle(ButtonStyle.Secondary)
+            );
+
+         // Send processing notification with payment methods button
+         await interaction.reply({
+            embeds: [processingEmbed],
+            components: [actionRow, paymentButtonRow]
+         });
+      }
 
       // Log to ticket logs if configured
       const logsChannelId = process.env.TICKETS_LOGS_CHANNEL;
@@ -512,16 +538,31 @@ async function unmarkProcessing(interaction) {
                .setEmoji('✅')
                .setStyle(ButtonStyle.Success),
             new ButtonBuilder()
-               .setCustomId('ticket_process')
-               .setLabel('Mark as Processing')
-               .setEmoji('⚙️')
-               .setStyle(ButtonStyle.Primary),
+               .setCustomId('order_unprocess')
+               .setLabel('Unmark Processing')
+               .setEmoji('⏹️')
+               .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
                .setCustomId('claim_ticket')
                .setLabel('Claim Ticket')
                .setEmoji('🎯')
                .setStyle(ButtonStyle.Primary)
          );
+
+         // Add payment methods button for orders
+         const paymentButtonRow = new ActionRowBuilder()
+            .addComponents(
+               new ButtonBuilder()
+                  .setCustomId('show_order_payment_methods')
+                  .setLabel('Payment Methods')
+                  .setEmoji('💳')
+                  .setStyle(ButtonStyle.Secondary)
+            );
+
+         await interaction.reply({
+            embeds: [unprocessEmbed],
+            components: [actionRow, paymentButtonRow]
+         });
       } else {
          // Support ticket buttons (including roblox-dev-)
          actionRow.addComponents(
@@ -546,12 +587,22 @@ async function unmarkProcessing(interaction) {
                .setEmoji('🎯')
                .setStyle(ButtonStyle.Primary)
          );
-      }
 
-      await interaction.reply({
-         embeds: [unprocessEmbed],
-         components: [actionRow]
-      });
+         // Add payment methods button for tickets
+         const paymentButtonRow = new ActionRowBuilder()
+            .addComponents(
+               new ButtonBuilder()
+                  .setCustomId('show_payment_methods')
+                  .setLabel('Payment Methods')
+                  .setEmoji('💳')
+                  .setStyle(ButtonStyle.Secondary)
+            );
+
+         await interaction.reply({
+            embeds: [unprocessEmbed],
+            components: [actionRow, paymentButtonRow]
+         });
+      }
 
    } catch (error) {
       console.error('Error unmarking:', error);
@@ -636,6 +687,22 @@ async function claimTicket(interaction) {
                .setEmoji('🔓')
                .setStyle(ButtonStyle.Secondary)
          );
+
+         // Add payment methods button for orders
+         const paymentButtonRow = new ActionRowBuilder()
+            .addComponents(
+               new ButtonBuilder()
+                  .setCustomId('show_order_payment_methods')
+                  .setLabel('Payment Methods')
+                  .setEmoji('💳')
+                  .setStyle(ButtonStyle.Secondary)
+            );
+
+         // Send claim notification with payment methods button
+         await interaction.reply({
+            embeds: [claimEmbed],
+            components: [actionRow, paymentButtonRow]
+         });
       } else {
          // Support ticket buttons with claim status
          actionRow.addComponents(
@@ -660,13 +727,23 @@ async function claimTicket(interaction) {
                .setEmoji('🔓')
                .setStyle(ButtonStyle.Secondary)
          );
-      }
 
-      // Send claim notification
-      await interaction.reply({
-         embeds: [claimEmbed],
-         components: [actionRow]
-      });
+         // Add payment methods button for tickets
+         const paymentButtonRow = new ActionRowBuilder()
+            .addComponents(
+               new ButtonBuilder()
+                  .setCustomId('show_payment_methods')
+                  .setLabel('Payment Methods')
+                  .setEmoji('💳')
+                  .setStyle(ButtonStyle.Secondary)
+            );
+
+         // Send claim notification with payment methods button
+         await interaction.reply({
+            embeds: [claimEmbed],
+            components: [actionRow, paymentButtonRow]
+         });
+      }
 
       // Log to ticket logs if configured
       const logsChannelId = process.env.TICKETS_LOGS_CHANNEL;
@@ -785,6 +862,22 @@ async function unclaimTicket(interaction) {
                .setEmoji('🎯')
                .setStyle(ButtonStyle.Primary)
          );
+
+         // Add payment methods button for orders
+         const paymentButtonRow = new ActionRowBuilder()
+            .addComponents(
+               new ButtonBuilder()
+                  .setCustomId('show_order_payment_methods')
+                  .setLabel('Payment Methods')
+                  .setEmoji('💳')
+                  .setStyle(ButtonStyle.Secondary)
+            );
+
+         // Send unclaim notification with payment methods button
+         await interaction.reply({
+            embeds: [unclaimEmbed],
+            components: [actionRow, paymentButtonRow]
+         });
       } else {
          // Support ticket buttons without claim
          actionRow.addComponents(
@@ -809,13 +902,23 @@ async function unclaimTicket(interaction) {
                .setEmoji('🎯')
                .setStyle(ButtonStyle.Primary)
          );
-      }
 
-      // Send unclaim notification
-      await interaction.reply({
-         embeds: [unclaimEmbed],
-         components: [actionRow]
-      });
+         // Add payment methods button for tickets
+         const paymentButtonRow = new ActionRowBuilder()
+            .addComponents(
+               new ButtonBuilder()
+                  .setCustomId('show_payment_methods')
+                  .setLabel('Payment Methods')
+                  .setEmoji('💳')
+                  .setStyle(ButtonStyle.Secondary)
+            );
+
+         // Send unclaim notification with payment methods button
+         await interaction.reply({
+            embeds: [unclaimEmbed],
+            components: [actionRow, paymentButtonRow]
+         });
+      }
 
       // Log to ticket logs if configured
       const logsChannelId = process.env.TICKETS_LOGS_CHANNEL;

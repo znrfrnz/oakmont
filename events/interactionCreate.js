@@ -28,7 +28,7 @@ const db = new sqlite3.Database(path.join(__dirname, '../db/shop.db'));
 const { handleOrderSubmit, handleOrderComplete, handleOrderCancel, handleOrderCancelConfirm, findBestMatch } = require('../handlers/orderHandler');
 
 // Import ticket handler functions
-const { handleTicketComplete, markAsProcessing, unmarkProcessing } = require('../handlers/ticketHandler');
+const { handleTicketComplete, markAsProcessing, unmarkProcessing, showPaymentMethods } = require('../handlers/ticketHandler');
 
 // Import FAQ handler functions
 const { handleFaqAddModalSubmit, handleFaqEditSelection, handleFaqEditModalSubmit, handleFaqRemoveSelection, handleFaqReorderSelection, handleFaqReorderModalSubmit } = require('../handlers/faqHandler');
@@ -156,6 +156,19 @@ module.exports = {
          // Handle ticket completion button
          if (interaction.customId === 'ticket_complete') {
             await handleTicketComplete(interaction);
+            return;
+         }
+
+         // Handle payment methods button
+         if (interaction.customId === 'show_payment_methods') {
+            await showPaymentMethods(interaction, db);
+            return;
+         }
+
+         // Handle order payment methods button
+         if (interaction.customId === 'show_order_payment_methods') {
+            const { showPaymentMethods } = require('../handlers/orderHandler');
+            await showPaymentMethods(interaction, db);
             return;
          }
 
@@ -437,11 +450,21 @@ module.exports = {
                   .setStyle(ButtonStyle.Primary)
             );
 
+         // Add a second row for payment methods button
+         const paymentButtonRow = new ActionRowBuilder()
+            .addComponents(
+               new ButtonBuilder()
+                  .setCustomId('show_payment_methods')
+                  .setLabel('Payment Methods')
+                  .setEmoji('💳')
+                  .setStyle(ButtonStyle.Secondary)
+            );
+
          // Send the ticket details to the new channel
          await ticketChannel.send({
             content: `${interaction.user} Your support ticket has been created!`,
             embeds: [ticketEmbed],
-            components: [buttonRow]
+            components: [buttonRow, paymentButtonRow]
          });
 
          // Send confirmation to the user
@@ -788,15 +811,25 @@ async function handleTicketModalSubmit(interaction) {
             new ButtonBuilder()
                .setCustomId('claim_ticket')
                .setLabel('Claim Ticket')
-               .setEmoji('��')
+               .setEmoji('🎯')
                .setStyle(ButtonStyle.Primary)
+         );
+
+      // Add a second row for payment methods button
+      const paymentButtonRow = new ActionRowBuilder()
+         .addComponents(
+            new ButtonBuilder()
+               .setCustomId('show_payment_methods')
+               .setLabel('Payment Methods')
+               .setEmoji('💳')
+               .setStyle(ButtonStyle.Secondary)
          );
 
       // Send the ticket details to the new channel
       await ticketChannel.send({
          content: `${interaction.user} Your support ticket has been created!`,
          embeds: [ticketEmbed],
-         components: [buttonRow]
+         components: [buttonRow, paymentButtonRow]
       });
 
       // Send confirmation to the user
@@ -971,11 +1004,21 @@ async function handleRobloxDevTicketModalSubmit(interaction) {
                .setStyle(ButtonStyle.Primary)
          );
 
+      // Add a second row for payment methods button
+      const paymentButtonRow = new ActionRowBuilder()
+         .addComponents(
+            new ButtonBuilder()
+               .setCustomId('show_payment_methods')
+               .setLabel('Payment Methods')
+               .setEmoji('💳')
+               .setStyle(ButtonStyle.Secondary)
+         );
+
       // Send the ticket details to the new channel
       await ticketChannel.send({
          content: `${interaction.user} Your Roblox Game Dev Service ticket has been created!`,
          embeds: [ticketEmbed],
-         components: [buttonRow]
+         components: [buttonRow, paymentButtonRow]
       });
 
       // Send confirmation to the user
