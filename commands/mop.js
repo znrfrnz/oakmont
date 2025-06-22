@@ -55,6 +55,11 @@ module.exports = {
                   .setRequired(true)
             )
             .addStringOption(option =>
+               option.setName('new_name')
+                  .setDescription('New payment method name')
+                  .setRequired(false)
+            )
+            .addStringOption(option =>
                option.setName('details')
                   .setDescription('New payment details')
                   .setRequired(false)
@@ -299,12 +304,13 @@ async function handleEdit(interaction, db) {
    try {
       const adminId = interaction.user.id;
       const name = interaction.options.getString('name');
+      const newName = interaction.options.getString('new_name');
       const newDetails = interaction.options.getString('details');
       const newNotes = interaction.options.getString('notes');
 
       // Check if at least one field is provided
-      if (!newDetails && !newNotes) {
-         await interaction.editReply('❌ Please provide at least one field to edit (details or notes).');
+      if (!newName && !newDetails && !newNotes) {
+         await interaction.editReply('❌ Please provide at least one field to edit (new_name, details, or notes).');
          return;
       }
 
@@ -321,14 +327,30 @@ async function handleEdit(interaction, db) {
          return;
       }
 
+      // If changing the name, check for conflicts
+      if (newName !== null && newName.toLowerCase() !== paymentMethod.name.toLowerCase()) {
+         const existingWithNewName = await new Promise((resolve, reject) => {
+            db.get('SELECT * FROM payment_methods WHERE admin_id = ? AND LOWER(name) = LOWER(?)', [adminId, newName], (err, row) => {
+               if (err) reject(err);
+               else resolve(row);
+            });
+         });
+
+         if (existingWithNewName) {
+            await interaction.editReply(`❌ Payment method "${newName}" already exists for your account.`);
+            return;
+         }
+      }
+
       // Update the payment method
+      const finalName = newName !== null ? newName : paymentMethod.name;
       const finalDetails = newDetails !== null ? newDetails : paymentMethod.details;
       const finalNotes = newNotes !== null ? newNotes : paymentMethod.notes;
 
       await new Promise((resolve, reject) => {
          db.run(
-            'UPDATE payment_methods SET details = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            [finalDetails, finalNotes, paymentMethod.id],
+            'UPDATE payment_methods SET name = ?, details = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [finalName, finalDetails, finalNotes, paymentMethod.id],
             function (err) {
                if (err) reject(err);
                else resolve(this.changes);
@@ -340,6 +362,7 @@ async function handleEdit(interaction, db) {
          .setTitle('✅ Payment Method Updated')
          .setDescription(`Successfully updated payment method: **${paymentMethod.name}**`)
          .addFields(
+            { name: 'Name', value: finalName, inline: false },
             { name: 'Details', value: finalDetails, inline: false },
             { name: 'Notes', value: finalNotes || 'None', inline: false },
             { name: 'Admin', value: `<@${adminId}>`, inline: false }
