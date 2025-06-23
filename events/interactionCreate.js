@@ -658,21 +658,20 @@ module.exports = {
                embed.setImage(gifUrl);
             }
 
-            // Add reroll and cancel buttons
+            // Add Join Giveaway button
             const buttonRow = new ActionRowBuilder().addComponents(
                new ButtonBuilder()
-                  .setCustomId(`giveaway_reroll_${Date.now()}`)
-                  .setLabel('Reroll')
-                  .setStyle(ButtonStyle.Primary),
-               new ButtonBuilder()
-                  .setCustomId(`giveaway_cancel_${Date.now()}`)
-                  .setLabel('Cancel')
-                  .setStyle(ButtonStyle.Danger)
+                  .setCustomId(`giveaway_join_${Date.now()}`)
+                  .setLabel('🎉 Join Giveaway')
+                  .setStyle(ButtonStyle.Success)
             );
 
             // Send the embed to the selected channel
             const giveawayMsg = await channel.send({ embeds: [embed], components: [buttonRow] });
-            await giveawayMsg.react('🎉');
+
+            // In-memory entry tracking (messageId -> Set of userIds)
+            if (!global.giveawayEntries) global.giveawayEntries = {};
+            global.giveawayEntries[giveawayMsg.id] = new Set();
 
             // Save to DB for persistence
             const { saveGiveaway, deleteGiveaway } = require('../db/giveaways.db');
@@ -694,31 +693,23 @@ module.exports = {
             });
 
             // Helper to pick winners
-            async function pickWinners(msg, guild, minRole, numWinners, prize, announce = true) {
-               const reaction = msg.reactions.cache.get('🎉');
-               if (!reaction) {
-                  if (announce) await channel.send('No one entered the giveaway. 😢');
-                  return [];
-               }
-               let users = await reaction.users.fetch();
-               users = users.filter(u => !u.bot);
-               // Filter by minimum role if specified
-               let eligibleUsers = users;
+            async function pickWinnersFromEntries(entries, guild, minRole, numWinners, prize, announce = true) {
+               let eligibleUserIds = Array.from(entries);
                if (minRole) {
                   let role = guild.roles.cache.find(r => r.id === minRole || r.name.toLowerCase() === minRole.toLowerCase());
                   if (role) {
-                     eligibleUsers = users.filter(u => {
-                        const member = guild.members.cache.get(u.id);
+                     eligibleUserIds = eligibleUserIds.filter(uid => {
+                        const member = guild.members.cache.get(uid);
                         return member && member.roles.cache.has(role.id);
                      });
                   }
                }
-               if (!eligibleUsers.size) {
+               if (!eligibleUserIds.length) {
                   if (announce) await channel.send('No eligible users entered the giveaway. 😢');
                   return [];
                }
                // Pick unique winners
-               const pool = Array.from(eligibleUsers.values());
+               const pool = [...eligibleUserIds];
                const winners = [];
                while (winners.length < Math.min(numWinners, pool.length)) {
                   const idx = Math.floor(Math.random() * pool.length);
@@ -726,9 +717,9 @@ module.exports = {
                }
                if (announce) {
                   if (winners.length === 1) {
-                     await channel.send(`🎉 Congratulations ${winners[0]}! You won **${prize}**!`);
+                     await channel.send(`🎉 Congratulations <@${winners[0]}>! You won **${prize}**!`);
                   } else {
-                     await channel.send(`🎉 Congratulations ${winners.map(u => u.toString()).join(', ')}! You won **${prize}**!`);
+                     await channel.send(`🎉 Congratulations ${winners.map(uid => `<@${uid}>`).join(', ')}! You won **${prize}**!`);
                   }
                }
                return winners;
@@ -737,12 +728,14 @@ module.exports = {
             // Schedule the giveaway end
             setTimeout(async () => {
                try {
-                  const msg = await channel.messages.fetch(giveawayMsg.id);
-                  await pickWinners(msg, interaction.guild, minRole, numWinners, prize, true);
+                  const entries = global.giveawayEntries[giveawayMsg.id] || new Set();
+                  await pickWinnersFromEntries(entries, interaction.guild, minRole, numWinners, prize, true);
                   await deleteGiveaway(giveawayMsg.id);
+                  delete global.giveawayEntries[giveawayMsg.id];
                } catch (err) {
                   await channel.send('❌ Error ending the giveaway.');
                   await deleteGiveaway(giveawayMsg.id);
+                  delete global.giveawayEntries[giveawayMsg.id];
                }
             }, durationMs);
             return;
@@ -778,63 +771,17 @@ module.exports = {
          }
       }
 
-      // Handle reroll/cancel buttons for giveaways
-      if (interaction.isButton() && interaction.customId.startsWith('giveaway_reroll_')) {
-         // Only allow reroll by admins or the user who started the giveaway (for now, allow all)
-         try {
-            const msg = await interaction.channel.messages.fetch(interaction.message.id);
-            // Read embed for prize, minRole, numWinners
-            const embed = msg.embeds[0];
-            const prize = embed.fields.find(f => f.name === 'Prize')?.value || 'the prize';
-            const minRole = embed.fields.find(f => f.name === 'Minimum Role')?.value;
-            const numWinners = parseInt(embed.fields.find(f => f.name === 'Number of Winners')?.value || '1', 10);
-            const winners = await (async () => {
-               const reaction = msg.reactions.cache.get('🎉');
-               if (!reaction) return [];
-               let users = await reaction.users.fetch();
-               users = users.filter(u => !u.bot);
-               let eligibleUsers = users;
-               if (minRole && minRole !== 'None') {
-                  let role = interaction.guild.roles.cache.find(r => r.id === minRole || r.name.toLowerCase() === minRole.toLowerCase());
-                  if (role) {
-                     eligibleUsers = users.filter(u => {
-                        const member = interaction.guild.members.cache.get(u.id);
-                        return member && member.roles.cache.has(role.id);
-                     });
-                  }
-               }
-               if (!eligibleUsers.size) return [];
-               const pool = Array.from(eligibleUsers.values());
-               const winners = [];
-               while (winners.length < Math.min(numWinners, pool.length)) {
-                  const idx = Math.floor(Math.random() * pool.length);
-                  winners.push(pool.splice(idx, 1)[0]);
-               }
-               return winners;
-            })();
-            if (!winners.length) {
-               await interaction.reply({ content: 'No eligible users to reroll.', ephemeral: true });
-            } else if (winners.length === 1) {
-               await interaction.reply({ content: `🎉 Reroll: Congratulations ${winners[0]}!`, ephemeral: false });
-            } else {
-               await interaction.reply({ content: `🎉 Reroll: Congratulations ${winners.map(u => u.toString()).join(', ')}!`, ephemeral: false });
-            }
-         } catch (err) {
-            await interaction.reply({ content: '❌ Error rerolling the giveaway.', ephemeral: true });
-         }
-         return;
-      }
-      if (interaction.isButton() && interaction.customId.startsWith('giveaway_cancel_')) {
-         // Only allow cancel by admins or the user who started the giveaway (for now, allow all)
-         try {
-            // Remove the giveaway from DB and disable buttons
-            const msg = await interaction.channel.messages.fetch(interaction.message.id);
-            const { deleteGiveaway } = require('../db/giveaways.db');
-            await deleteGiveaway(msg.id);
-            await msg.edit({ components: [] });
-            await interaction.reply({ content: '❌ Giveaway cancelled.', ephemeral: false });
-         } catch (err) {
-            await interaction.reply({ content: '❌ Error cancelling the giveaway.', ephemeral: true });
+      // Handle Join Giveaway button
+      if (interaction.isButton() && interaction.customId.startsWith('giveaway_join_')) {
+         const messageId = interaction.customId.replace('giveaway_join_', '');
+         if (!global.giveawayEntries) global.giveawayEntries = {};
+         if (!global.giveawayEntries[messageId]) global.giveawayEntries[messageId] = new Set();
+         const entries = global.giveawayEntries[messageId];
+         if (entries.has(interaction.user.id)) {
+            await interaction.reply({ content: 'You have already joined this giveaway!', ephemeral: true });
+         } else {
+            entries.add(interaction.user.id);
+            await interaction.reply({ content: 'You have joined the giveaway! 🎉', ephemeral: true });
          }
          return;
       }

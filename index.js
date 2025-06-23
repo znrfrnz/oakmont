@@ -236,6 +236,14 @@ for (const file of commandFiles) {
             console.warn(`[⚠️] The command in array at ${filePath} is missing "data" or "execute".`);
          }
       }
+   } else if (typeof commandExport === 'object') {
+      for (const key of Object.keys(commandExport)) {
+         const command = commandExport[key];
+         if (command && typeof command === 'object' && 'data' in command && 'execute' in command) {
+            command.db = db;
+            client.commands.set(command.data.name, command);
+         }
+      }
    } else if ('data' in commandExport && 'execute' in commandExport) {
       commandExport.db = db;
       client.commands.set(commandExport.data.name, commandExport);
