@@ -5,6 +5,8 @@ const { Client, Collection, GatewayIntentBits, Partials, ActivityType } = requir
 require('dotenv').config();
 const updateStockEmbed = require('./utils/updateStockEmbed');
 const updateQueueEmbed = require('./utils/updateQueueEmbed');
+const { loadAllGiveaways, deleteGiveaway } = require('./db/giveaways.db');
+const { parseDuration } = require('./utils/createGiveawayUtils');
 
 // Create a new Discord client
 const client = new Client({
@@ -98,6 +100,88 @@ client.once('ready', async () => {
    // Update the FAQ embed
    const updateFaqEmbed = require('./utils/updateFaqEmbed');
    await updateFaqEmbed(client, db).catch(console.error);
+
+   // Restore ongoing giveaways
+   const giveaways = await loadAllGiveaways();
+   for (const g of giveaways) {
+      const guild = client.guilds.cache.get(g.guildId);
+      if (!guild) continue;
+      const channel = guild.channels.cache.get(g.channelId);
+      if (!channel || !channel.isTextBased()) continue;
+      const timeLeft = g.endTime - Date.now();
+      if (timeLeft <= 0) {
+         // End immediately if overdue
+         setTimeout(async () => {
+            try {
+               const msg = await channel.messages.fetch(g.messageId);
+               const reaction = msg.reactions.cache.get('🎉');
+               if (!reaction) {
+                  await channel.send('No one entered the giveaway. 😢');
+                  await deleteGiveaway(g.messageId);
+                  return;
+               }
+               let users = await reaction.users.fetch();
+               users = users.filter(u => !u.bot);
+               let eligibleUsers = users;
+               if (g.minRole) {
+                  let role = guild.roles.cache.find(r => r.id === g.minRole || r.name.toLowerCase() === g.minRole.toLowerCase());
+                  if (role) {
+                     eligibleUsers = users.filter(u => {
+                        const member = guild.members.cache.get(u.id);
+                        return member && member.roles.cache.has(role.id);
+                     });
+                  }
+               }
+               if (!eligibleUsers.size) {
+                  await channel.send('No eligible users entered the giveaway. 😢');
+                  await deleteGiveaway(g.messageId);
+                  return;
+               }
+               const winner = eligibleUsers.random();
+               await channel.send(`🎉 Congratulations ${winner}! You won **${g.prize}**!`);
+               await deleteGiveaway(g.messageId);
+            } catch (err) {
+               await channel.send('❌ Error ending the giveaway.');
+               await deleteGiveaway(g.messageId);
+            }
+         }, 5000);
+      } else {
+         setTimeout(async () => {
+            try {
+               const msg = await channel.messages.fetch(g.messageId);
+               const reaction = msg.reactions.cache.get('🎉');
+               if (!reaction) {
+                  await channel.send('No one entered the giveaway. 😢');
+                  await deleteGiveaway(g.messageId);
+                  return;
+               }
+               let users = await reaction.users.fetch();
+               users = users.filter(u => !u.bot);
+               let eligibleUsers = users;
+               if (g.minRole) {
+                  let role = guild.roles.cache.find(r => r.id === g.minRole || r.name.toLowerCase() === g.minRole.toLowerCase());
+                  if (role) {
+                     eligibleUsers = users.filter(u => {
+                        const member = guild.members.cache.get(u.id);
+                        return member && member.roles.cache.has(role.id);
+                     });
+                  }
+               }
+               if (!eligibleUsers.size) {
+                  await channel.send('No eligible users entered the giveaway. 😢');
+                  await deleteGiveaway(g.messageId);
+                  return;
+               }
+               const winner = eligibleUsers.random();
+               await channel.send(`🎉 Congratulations ${winner}! You won **${g.prize}**!`);
+               await deleteGiveaway(g.messageId);
+            } catch (err) {
+               await channel.send('❌ Error ending the giveaway.');
+               await deleteGiveaway(g.messageId);
+            }
+         }, timeLeft);
+      }
+   }
 });
 
 // Initialize command collection

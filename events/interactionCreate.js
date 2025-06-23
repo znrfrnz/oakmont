@@ -616,6 +616,146 @@ module.exports = {
             return;
          }
 
+         if (interaction.customId === 'giveaway_create_modal') {
+            // Extract modal fields
+            const prize = interaction.fields.getTextInputValue('giveaway_prize');
+            const duration = interaction.fields.getTextInputValue('giveaway_duration');
+            const minRole = interaction.fields.getTextInputValue('giveaway_min_role');
+            const channelInput = interaction.fields.getTextInputValue('giveaway_channel');
+            const numWinnersInput = interaction.fields.getTextInputValue('giveaway_num_winners');
+            let numWinners = parseInt(numWinnersInput, 10);
+            if (isNaN(numWinners) || numWinners < 1) numWinners = 1;
+
+            // Parse channel (ID or mention)
+            let channelId = channelInput;
+            const mentionMatch = channelInput.match(/^<#(\d+)>$/);
+            if (mentionMatch) {
+               channelId = mentionMatch[1];
+            } else if (/^\d+$/.test(channelInput)) {
+               channelId = channelInput;
+            } else {
+               // Try to find by name
+               const found = interaction.guild.channels.cache.find(c => c.name === channelInput.replace(/^#/, ''));
+               if (found) channelId = found.id;
+            }
+            const channel = interaction.guild.channels.cache.get(channelId);
+            if (!channel || !channel.isTextBased()) {
+               await interaction.reply({ content: '❌ Invalid channel. Please provide a valid channel mention or ID.', ephemeral: true });
+               return;
+            }
+
+            // Parse duration
+            const { parseDuration } = require('../utils/createGiveawayUtils');
+            const durationMs = parseDuration(duration);
+            if (!durationMs || durationMs < 5000) {
+               await interaction.reply({ content: '❌ Invalid duration. Use formats like 1h, 2d, 7d, 10m, etc.', ephemeral: true });
+               return;
+            }
+
+            // Build the giveaway embed
+            const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+            const embed = new EmbedBuilder()
+               .setTitle('🎉 Giveaway!')
+               .addFields(
+                  { name: 'Prize', value: prize, inline: false },
+                  { name: 'Duration', value: duration, inline: true },
+                  { name: 'Minimum Role', value: minRole || 'None', inline: true },
+                  { name: 'Number of Winners', value: numWinners.toString(), inline: true },
+                  { name: 'How to Enter', value: 'React with 🎉 to enter!', inline: false }
+               )
+               .setTimestamp()
+               .setColor(0xFFD700);
+
+            // Add reroll and cancel buttons
+            const buttonRow = new ActionRowBuilder().addComponents(
+               new ButtonBuilder()
+                  .setCustomId(`giveaway_reroll_${Date.now()}`)
+                  .setLabel('Reroll')
+                  .setStyle(ButtonStyle.Primary),
+               new ButtonBuilder()
+                  .setCustomId(`giveaway_cancel_${Date.now()}`)
+                  .setLabel('Cancel')
+                  .setStyle(ButtonStyle.Danger)
+            );
+
+            // Send the embed to the selected channel
+            const giveawayMsg = await channel.send({ embeds: [embed], components: [buttonRow] });
+            await giveawayMsg.react('🎉');
+
+            // Save to DB for persistence
+            const { saveGiveaway, deleteGiveaway } = require('../db/giveaways.db');
+            const endTime = Date.now() + durationMs;
+            await saveGiveaway({
+               messageId: giveawayMsg.id,
+               channelId: channel.id,
+               guildId: interaction.guild.id,
+               prize,
+               durationMs,
+               minRole,
+               endTime,
+               numWinners
+            });
+
+            await interaction.reply({
+               content: `✅ Giveaway started in ${channel}!`,
+               ephemeral: true
+            });
+
+            // Helper to pick winners
+            async function pickWinners(msg, guild, minRole, numWinners, prize, announce = true) {
+               const reaction = msg.reactions.cache.get('🎉');
+               if (!reaction) {
+                  if (announce) await channel.send('No one entered the giveaway. 😢');
+                  return [];
+               }
+               let users = await reaction.users.fetch();
+               users = users.filter(u => !u.bot);
+               // Filter by minimum role if specified
+               let eligibleUsers = users;
+               if (minRole) {
+                  let role = guild.roles.cache.find(r => r.id === minRole || r.name.toLowerCase() === minRole.toLowerCase());
+                  if (role) {
+                     eligibleUsers = users.filter(u => {
+                        const member = guild.members.cache.get(u.id);
+                        return member && member.roles.cache.has(role.id);
+                     });
+                  }
+               }
+               if (!eligibleUsers.size) {
+                  if (announce) await channel.send('No eligible users entered the giveaway. 😢');
+                  return [];
+               }
+               // Pick unique winners
+               const pool = Array.from(eligibleUsers.values());
+               const winners = [];
+               while (winners.length < Math.min(numWinners, pool.length)) {
+                  const idx = Math.floor(Math.random() * pool.length);
+                  winners.push(pool.splice(idx, 1)[0]);
+               }
+               if (announce) {
+                  if (winners.length === 1) {
+                     await channel.send(`🎉 Congratulations ${winners[0]}! You won **${prize}**!`);
+                  } else {
+                     await channel.send(`🎉 Congratulations ${winners.map(u => u.toString()).join(', ')}! You won **${prize}**!`);
+                  }
+               }
+               return winners;
+            }
+
+            // Schedule the giveaway end
+            setTimeout(async () => {
+               try {
+                  const msg = await channel.messages.fetch(giveawayMsg.id);
+                  await pickWinners(msg, interaction.guild, minRole, numWinners, prize, true);
+                  await deleteGiveaway(giveawayMsg.id);
+               } catch (err) {
+                  await channel.send('❌ Error ending the giveaway.');
+                  await deleteGiveaway(giveawayMsg.id);
+               }
+            }, durationMs);
+            return;
+         }
+
          if (interaction.customId === 'faq_edit_modal') {
             await handleFaqEditModalSubmit(interaction, db);
             return;
@@ -644,6 +784,67 @@ module.exports = {
             await handleFaqReorderSelection(interaction, db);
             return;
          }
+      }
+
+      // Handle reroll/cancel buttons for giveaways
+      if (interaction.isButton() && interaction.customId.startsWith('giveaway_reroll_')) {
+         // Only allow reroll by admins or the user who started the giveaway (for now, allow all)
+         try {
+            const msg = await interaction.channel.messages.fetch(interaction.message.id);
+            // Read embed for prize, minRole, numWinners
+            const embed = msg.embeds[0];
+            const prize = embed.fields.find(f => f.name === 'Prize')?.value || 'the prize';
+            const minRole = embed.fields.find(f => f.name === 'Minimum Role')?.value;
+            const numWinners = parseInt(embed.fields.find(f => f.name === 'Number of Winners')?.value || '1', 10);
+            const winners = await (async () => {
+               const reaction = msg.reactions.cache.get('🎉');
+               if (!reaction) return [];
+               let users = await reaction.users.fetch();
+               users = users.filter(u => !u.bot);
+               let eligibleUsers = users;
+               if (minRole && minRole !== 'None') {
+                  let role = interaction.guild.roles.cache.find(r => r.id === minRole || r.name.toLowerCase() === minRole.toLowerCase());
+                  if (role) {
+                     eligibleUsers = users.filter(u => {
+                        const member = interaction.guild.members.cache.get(u.id);
+                        return member && member.roles.cache.has(role.id);
+                     });
+                  }
+               }
+               if (!eligibleUsers.size) return [];
+               const pool = Array.from(eligibleUsers.values());
+               const winners = [];
+               while (winners.length < Math.min(numWinners, pool.length)) {
+                  const idx = Math.floor(Math.random() * pool.length);
+                  winners.push(pool.splice(idx, 1)[0]);
+               }
+               return winners;
+            })();
+            if (!winners.length) {
+               await interaction.reply({ content: 'No eligible users to reroll.', ephemeral: true });
+            } else if (winners.length === 1) {
+               await interaction.reply({ content: `🎉 Reroll: Congratulations ${winners[0]}!`, ephemeral: false });
+            } else {
+               await interaction.reply({ content: `🎉 Reroll: Congratulations ${winners.map(u => u.toString()).join(', ')}!`, ephemeral: false });
+            }
+         } catch (err) {
+            await interaction.reply({ content: '❌ Error rerolling the giveaway.', ephemeral: true });
+         }
+         return;
+      }
+      if (interaction.isButton() && interaction.customId.startsWith('giveaway_cancel_')) {
+         // Only allow cancel by admins or the user who started the giveaway (for now, allow all)
+         try {
+            // Remove the giveaway from DB and disable buttons
+            const msg = await interaction.channel.messages.fetch(interaction.message.id);
+            const { deleteGiveaway } = require('../db/giveaways.db');
+            await deleteGiveaway(msg.id);
+            await msg.edit({ components: [] });
+            await interaction.reply({ content: '❌ Giveaway cancelled.', ephemeral: false });
+         } catch (err) {
+            await interaction.reply({ content: '❌ Error cancelling the giveaway.', ephemeral: true });
+         }
+         return;
       }
    },
 };
