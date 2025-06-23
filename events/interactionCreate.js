@@ -621,7 +621,6 @@ module.exports = {
             const prize = interaction.fields.getTextInputValue('giveaway_prize');
             const duration = interaction.fields.getTextInputValue('giveaway_duration');
             const minRole = interaction.fields.getTextInputValue('giveaway_min_role');
-            const channelInput = interaction.fields.getTextInputValue('giveaway_channel');
             const numWinnersInput = interaction.fields.getTextInputValue('giveaway_num_winners');
             let numWinners = parseInt(numWinnersInput, 10);
             if (isNaN(numWinners) || numWinners < 1) numWinners = 1;
