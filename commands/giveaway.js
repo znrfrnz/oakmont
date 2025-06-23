@@ -6,7 +6,13 @@ module.exports = [
       data: new SlashCommandBuilder()
          .setName('giveaway')
          .setDescription('Start a giveaway with a custom prize, duration, and minimum role.'),
-      async execute(interaction) {
+      async execute(interaction, db) {
+         // Restrict to admins only
+         const adminRoleId = process.env.ADMIN_ROLE_ID;
+         if (!interaction.member.roles.cache.has(adminRoleId)) {
+            await interaction.reply({ content: '❌ Only admins can use this command.', ephemeral: true });
+            return;
+         }
          // Create the modal
          const modal = new ModalBuilder()
             .setCustomId('giveaway_create_modal')
@@ -80,26 +86,5 @@ module.exports = [
          // Show the modal to the user
          await interaction.showModal(modal);
       },
-   },
-   {
-      data: new SlashCommandBuilder()
-         .setName('giveaways')
-         .setDescription('List all ongoing giveaways.'),
-      async execute(interaction) {
-         const giveaways = await loadAllGiveaways();
-         const serverGiveaways = giveaways.filter(g => g.guildId === interaction.guild.id);
-         if (!serverGiveaways.length) {
-            await interaction.reply({ content: 'There are no ongoing giveaways in this server.', ephemeral: true });
-            return;
-         }
-         const lines = serverGiveaways.map(g => {
-            const channel = interaction.guild.channels.cache.get(g.channelId);
-            const timeLeft = Math.max(0, g.endTime - Date.now());
-            const mins = Math.floor(timeLeft / 60000);
-            const secs = Math.floor((timeLeft % 60000) / 1000);
-            return `• ${channel ? channel : '#deleted-channel'} | **${g.prize}** | Ends in ${mins}m ${secs}s | Winners: ${g.numWinners || 1}`;
-         });
-         await interaction.reply({ content: `**Ongoing Giveaways:**\n${lines.join('\n')}`, ephemeral: true });
-      }
    }
 ]; 
