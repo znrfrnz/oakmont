@@ -628,23 +628,8 @@ module.exports = {
 
             const gifUrl = interaction.fields.getTextInputValue('giveaway_gif_url');
 
-            // Parse channel (ID or mention)
-            let channelId = channelInput;
-            const mentionMatch = channelInput.match(/^<#(\d+)>$/);
-            if (mentionMatch) {
-               channelId = mentionMatch[1];
-            } else if (/^\d+$/.test(channelInput)) {
-               channelId = channelInput;
-            } else {
-               // Try to find by name
-               const found = interaction.guild.channels.cache.find(c => c.name === channelInput.replace(/^#/, ''));
-               if (found) channelId = found.id;
-            }
-            const channel = interaction.guild.channels.cache.get(channelId);
-            if (!channel || !channel.isTextBased()) {
-               await interaction.reply({ content: '❌ Invalid channel. Please provide a valid channel mention or ID.', ephemeral: true });
-               return;
-            }
+            // Use the channel where the command was run
+            const channel = interaction.channel;
 
             // Parse duration
             const { parseDuration } = require('../utils/createGiveawayUtils');

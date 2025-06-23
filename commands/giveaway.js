@@ -44,15 +44,6 @@ module.exports = {
          .setRequired(false)
          .setMaxLength(50);
 
-      // Channel input
-      const channelInput = new TextInputBuilder()
-         .setCustomId('giveaway_channel')
-         .setLabel('Channel ID or #mention')
-         .setPlaceholder('e.g. #giveaways or 123456789012345678')
-         .setStyle(TextInputStyle.Short)
-         .setRequired(true)
-         .setMaxLength(50);
-
       // Number of winners input
       const winnersInput = new TextInputBuilder()
          .setCustomId('giveaway_num_winners')
@@ -75,12 +66,11 @@ module.exports = {
       const prizeRow = new ActionRowBuilder().addComponents(prizeInput);
       const durationRow = new ActionRowBuilder().addComponents(durationInput);
       const minRoleRow = new ActionRowBuilder().addComponents(minRoleInput);
-      const channelRow = new ActionRowBuilder().addComponents(channelInput);
       const winnersRow = new ActionRowBuilder().addComponents(winnersInput);
       const gifRow = new ActionRowBuilder().addComponents(gifInput);
 
-      // Add the rows to the modal
-      modal.addComponents(prizeRow, durationRow, minRoleRow, channelRow, winnersRow, gifRow);
+      // Add the rows to the modal (without channelRow)
+      modal.addComponents(prizeRow, durationRow, minRoleRow, winnersRow, gifRow);
 
       // Show the modal to the user
       await interaction.showModal(modal);
