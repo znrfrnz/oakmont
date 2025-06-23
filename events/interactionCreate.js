@@ -626,6 +626,8 @@ module.exports = {
             let numWinners = parseInt(numWinnersInput, 10);
             if (isNaN(numWinners) || numWinners < 1) numWinners = 1;
 
+            const gifUrl = interaction.fields.getTextInputValue('giveaway_gif_url');
+
             // Parse channel (ID or mention)
             let channelId = channelInput;
             const mentionMatch = channelInput.match(/^<#(\d+)>$/);
@@ -652,6 +654,8 @@ module.exports = {
                return;
             }
 
+            const endTimeUnix = Math.floor((Date.now() + durationMs) / 1000);
+
             // Build the giveaway embed
             const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
             const embed = new EmbedBuilder()
@@ -659,12 +663,16 @@ module.exports = {
                .addFields(
                   { name: 'Prize', value: prize, inline: false },
                   { name: 'Duration', value: duration, inline: true },
+                  { name: 'Ends', value: `<t:${endTimeUnix}:R>`, inline: true },
                   { name: 'Minimum Role', value: minRole || 'None', inline: true },
                   { name: 'Number of Winners', value: numWinners.toString(), inline: true },
                   { name: 'How to Enter', value: 'React with 🎉 to enter!', inline: false }
                )
                .setTimestamp()
                .setColor(0xFFD700);
+            if (gifUrl && gifUrl.startsWith('http')) {
+               embed.setImage(gifUrl);
+            }
 
             // Add reroll and cancel buttons
             const buttonRow = new ActionRowBuilder().addComponents(

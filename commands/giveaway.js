@@ -57,15 +57,25 @@ module.exports = [
             .setRequired(true)
             .setMaxLength(2);
 
+         // GIF URL input
+         const gifInput = new TextInputBuilder()
+            .setCustomId('giveaway_gif_url')
+            .setLabel('GIF URL (optional)')
+            .setPlaceholder('https://media.giphy.com/media/xyz.gif')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(300);
+
          // Add inputs to rows
          const prizeRow = new ActionRowBuilder().addComponents(prizeInput);
          const durationRow = new ActionRowBuilder().addComponents(durationInput);
          const minRoleRow = new ActionRowBuilder().addComponents(minRoleInput);
          const channelRow = new ActionRowBuilder().addComponents(channelInput);
          const winnersRow = new ActionRowBuilder().addComponents(winnersInput);
+         const gifRow = new ActionRowBuilder().addComponents(gifInput);
 
          // Add the rows to the modal
-         modal.addComponents(prizeRow, durationRow, minRoleRow, channelRow, winnersRow);
+         modal.addComponents(prizeRow, durationRow, minRoleRow, channelRow, winnersRow, gifRow);
 
          // Show the modal to the user
          await interaction.showModal(modal);
