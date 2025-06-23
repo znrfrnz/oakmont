@@ -226,12 +226,19 @@ client.db = db;
 // Modify the command registration loop to pass db
 for (const file of commandFiles) {
    const filePath = path.join(commandsPath, file);
-   const command = require(filePath);
-
-   if ('data' in command && 'execute' in command) {
-      // Add the db to the command object so it's accessible
-      command.db = db;
-      client.commands.set(command.data.name, command);
+   const commandExport = require(filePath);
+   if (Array.isArray(commandExport)) {
+      for (const command of commandExport) {
+         if ('data' in command && 'execute' in command) {
+            command.db = db;
+            client.commands.set(command.data.name, command);
+         } else {
+            console.warn(`[⚠️] The command in array at ${filePath} is missing "data" or "execute".`);
+         }
+      }
+   } else if ('data' in commandExport && 'execute' in commandExport) {
+      commandExport.db = db;
+      client.commands.set(commandExport.data.name, commandExport);
    } else {
       console.warn(`[⚠️] The command at ${filePath} is missing "data" or "execute".`);
    }
