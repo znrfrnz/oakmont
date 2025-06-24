@@ -163,7 +163,7 @@ module.exports = {
 
       switch (subcommand) {
          case 'update':
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: 64 });
             try {
                await updateStockEmbed(interaction.client, db);
                await interaction.editReply('✅ Stock embed updated successfully!');
@@ -174,7 +174,7 @@ module.exports = {
             break;
 
          case 'add':
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: 64 });
             try {
                const name = interaction.options.getString('name');
                const price = interaction.options.getNumber('price');
@@ -200,7 +200,7 @@ module.exports = {
             break;
 
          case 'remove':
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: 64 });
             try {
                const searchTerm = interaction.options.getString('name');
 
@@ -283,7 +283,7 @@ module.exports = {
             break;
 
          case 'list':
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: 64 });
             try {
                const items = await new Promise((resolve, reject) => {
                   db.all('SELECT * FROM stock ORDER BY name ASC', (err, rows) => {
@@ -312,7 +312,7 @@ module.exports = {
             break;
 
          case 'edit':
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: 64 });
             try {
                const searchTerm = interaction.options.getString('name');
                const newPrice = interaction.options.getNumber('price');

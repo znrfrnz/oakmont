@@ -192,7 +192,7 @@ const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
 // Initialize SQLite database and create tables if they don't exist
-const db = new sqlite3.Database('./database.sqlite');
+const db = new sqlite3.Database('./db/shop.db');
 
 // Create stock table if it doesn't exist
 db.run(`CREATE TABLE IF NOT EXISTS stock (
@@ -226,29 +226,39 @@ client.db = db;
 // Modify the command registration loop to pass db
 for (const file of commandFiles) {
    const filePath = path.join(commandsPath, file);
-   const commandExport = require(filePath);
-   if (Array.isArray(commandExport)) {
-      for (const command of commandExport) {
-         if ('data' in command && 'execute' in command) {
-            command.db = db;
-            client.commands.set(command.data.name, command);
-         } else {
-            console.warn(`[⚠️] The command in array at ${filePath} is missing "data" or "execute".`);
+
+   try {
+      const commandExport = require(filePath);
+
+      if (Array.isArray(commandExport)) {
+         for (const command of commandExport) {
+            if ('data' in command && 'execute' in command) {
+               command.db = db;
+               client.commands.set(command.data.name, command);
+            } else {
+               console.warn(`[⚠️] The command in array at ${filePath} is missing "data" or "execute".`);
+            }
          }
-      }
-   } else if (typeof commandExport === 'object') {
-      for (const key of Object.keys(commandExport)) {
-         const command = commandExport[key];
-         if (command && typeof command === 'object' && 'data' in command && 'execute' in command) {
-            command.db = db;
-            client.commands.set(command.data.name, command);
+      } else if (typeof commandExport === 'object') {
+         // First, check if the main export has data and execute (like stock.js, helpdesk.js)
+         if ('data' in commandExport && 'execute' in commandExport) {
+            commandExport.db = db;
+            client.commands.set(commandExport.data.name, commandExport);
          }
+
+         // Then check for additional commands as properties (like giveaway.js with reroll)
+         for (const key of Object.keys(commandExport)) {
+            const command = commandExport[key];
+            if (command && typeof command === 'object' && 'data' in command && 'execute' in command) {
+               command.db = db;
+               client.commands.set(command.data.name, command);
+            }
+         }
+      } else {
+         console.warn(`[⚠️] The command at ${filePath} is missing "data" or "execute".`);
       }
-   } else if ('data' in commandExport && 'execute' in commandExport) {
-      commandExport.db = db;
-      client.commands.set(commandExport.data.name, commandExport);
-   } else {
-      console.warn(`[⚠️] The command at ${filePath} is missing "data" or "execute".`);
+   } catch (error) {
+      console.error(`❌ Error loading command from ${file}:`, error);
    }
 }
 

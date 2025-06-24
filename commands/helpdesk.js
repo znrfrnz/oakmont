@@ -128,7 +128,7 @@ async function createCombinedPanel(interaction, channel, adminRoleName, userRole
 
    return await interaction.reply({
       content: `✅ Combined help desk panel has been created in ${channel}!`,
-      ephemeral: true
+      flags: 64
    });
 }
 
@@ -169,7 +169,7 @@ async function createTicketsPanel(interaction, channel, adminRoleName, userRoleN
 
    return await interaction.reply({
       content: `✅ Support ticket panel has been created in ${channel}!`,
-      ephemeral: true
+      flags: 64
    });
 }
 
@@ -210,6 +210,6 @@ async function createOrdersPanel(interaction, channel, adminRoleName, userRoleNa
 
    return await interaction.reply({
       content: `✅ Order panel has been created in ${channel}!`,
-      ephemeral: true
+      flags: 64
    });
 }

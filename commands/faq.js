@@ -57,7 +57,7 @@ module.exports = {
       } catch (error) {
          return interaction.reply({
             content: '❌ Error initializing FAQ database: ' + error.message,
-            ephemeral: true
+            flags: 64
          });
       }
 
@@ -146,7 +146,7 @@ async function handleEditFaq(interaction, db) {
    if (faqEntries.length === 0) {
       return interaction.reply({
          content: '❌ There are no FAQ entries to edit.',
-         ephemeral: true
+         flags: 64
       });
    }
 
@@ -165,7 +165,7 @@ async function handleEditFaq(interaction, db) {
    await interaction.reply({
       content: 'Please select an FAQ entry to edit:',
       components: [row],
-      ephemeral: true
+      flags: 64
    });
 }
 
@@ -184,7 +184,7 @@ async function handleRemoveFaq(interaction, db) {
    if (faqEntries.length === 0) {
       return interaction.reply({
          content: '❌ There are no FAQ entries to remove.',
-         ephemeral: true
+         flags: 64
       });
    }
 
@@ -203,7 +203,7 @@ async function handleRemoveFaq(interaction, db) {
    await interaction.reply({
       content: '⚠️ Please select an FAQ entry to remove:',
       components: [row],
-      ephemeral: true
+      flags: 64
    });
 }
 
@@ -222,7 +222,7 @@ async function handleListFaq(interaction, db) {
    if (faqEntries.length === 0) {
       return interaction.reply({
          content: 'ℹ️ There are no FAQ entries.',
-         ephemeral: true
+         flags: 64
       });
    }
 
@@ -243,7 +243,7 @@ async function handleListFaq(interaction, db) {
 
    await interaction.reply({
       embeds: [embed],
-      ephemeral: true
+      flags: 64
    });
 }
 
@@ -262,7 +262,7 @@ async function handleReorderFaq(interaction, db) {
    if (faqEntries.length < 2) {
       return interaction.reply({
          content: '❌ You need at least 2 FAQ entries to reorder them.',
-         ephemeral: true
+         flags: 64
       });
    }
 
@@ -281,7 +281,7 @@ async function handleReorderFaq(interaction, db) {
    await interaction.reply({
       content: 'Please select an FAQ entry to reposition:',
       components: [row],
-      ephemeral: true
+      flags: 64
    });
 }
 
@@ -289,19 +289,19 @@ async function handleReorderFaq(interaction, db) {
  * Forces an update of the FAQ embed
  */
 async function handleUpdateFaq(interaction, db) {
-   await interaction.deferReply({ ephemeral: true });
+   await interaction.deferReply({ flags: 64 });
 
    const result = await updateFaqEmbed(interaction.client, db);
 
    if (result.success) {
       await interaction.editReply({
          content: '✅ FAQ embed has been updated!',
-         ephemeral: true
+         flags: 64
       });
    } else {
       await interaction.editReply({
          content: `❌ Failed to update FAQ embed: ${result.error}`,
-         ephemeral: true
+         flags: 64
       });
    }
 }

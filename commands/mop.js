@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
    data: new SlashCommandBuilder()
@@ -120,7 +120,7 @@ module.exports = {
 };
 
 async function handleAdd(interaction, db) {
-   await interaction.deferReply({ ephemeral: true });
+   await interaction.deferReply({ flags: 64 });
 
    try {
       const adminId = interaction.user.id;
@@ -173,7 +173,7 @@ async function handleAdd(interaction, db) {
 }
 
 async function handleRemove(interaction, db) {
-   await interaction.deferReply({ ephemeral: true });
+   await interaction.deferReply({ flags: 64 });
 
    try {
       const adminId = interaction.user.id;
@@ -209,7 +209,7 @@ async function handleRemove(interaction, db) {
 }
 
 async function handleList(interaction, db) {
-   await interaction.deferReply({ ephemeral: true });
+   await interaction.deferReply({ flags: 64 });
 
    try {
       const adminId = interaction.user.id;
@@ -260,7 +260,7 @@ async function handleShow(interaction, db) {
       if (paymentMethods.length === 0) {
          await interaction.reply({
             content: '📋 No payment methods configured for your account. Use `/mop add` to add payment methods.',
-            ephemeral: true
+            flags: 64
          });
          return;
       }
@@ -293,13 +293,13 @@ async function handleShow(interaction, db) {
       console.error('Error showing payment methods:', error);
       await interaction.reply({
          content: '❌ Error displaying payment methods. Please try again.',
-         ephemeral: true
+         flags: 64
       });
    }
 }
 
 async function handleEdit(interaction, db) {
-   await interaction.deferReply({ ephemeral: true });
+   await interaction.deferReply({ flags: 64 });
 
    try {
       const adminId = interaction.user.id;
@@ -379,7 +379,7 @@ async function handleEdit(interaction, db) {
 }
 
 async function handleShowAll(interaction, db) {
-   await interaction.deferReply({ ephemeral: true });
+   await interaction.deferReply({ flags: 64 });
 
    try {
       // Check if user is admin

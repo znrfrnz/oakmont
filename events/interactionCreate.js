@@ -17,12 +17,7 @@ const {
 const updateStockEmbed = require('../utils/updateStockEmbed');
 const updateQueueEmbed = require('../utils/updateQueueEmbed');
 const updateFaqEmbed = require('../utils/updateFaqEmbed');
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 require('dotenv').config();
-
-// Initialize database connection
-const db = new sqlite3.Database(path.join(__dirname, '../db/shop.db'));
 
 // Import order handler functions
 const { handleOrderSubmit, handleOrderComplete, handleOrderCancel, handleOrderCancelConfirm, findBestMatch } = require('../handlers/orderHandler');
@@ -36,16 +31,30 @@ const { handleFaqAddModalSubmit, handleFaqEditSelection, handleFaqEditModalSubmi
 module.exports = {
    name: Events.InteractionCreate,
    async execute(interaction) {
+      // Use the database from the client instance
+      const db = interaction.client.db;
+
       if (interaction.isChatInputCommand()) {
          const command = interaction.client.commands.get(interaction.commandName);
-         if (!command) return;
+         if (!command) {
+            return;
+         }
 
          try {
             // Pass the db instance to the command
             await command.execute(interaction, db);
          } catch (err) {
-            console.error(err);
-            await interaction.reply({ content: '❌ Error executing command.', ephemeral: true });
+            console.error(`❌ Error executing command ${interaction.commandName}:`, err);
+            try {
+               // Check if interaction is still valid and hasn't been responded to
+               if (!interaction.replied && !interaction.deferred && !interaction.isModalSubmit()) {
+                  await interaction.reply({ content: '❌ Error executing command.', flags: 64 });
+               } else if (interaction.deferred && !interaction.replied) {
+                  await interaction.editReply({ content: '❌ Error executing command.' });
+               }
+            } catch (replyError) {
+               console.error('Error sending error response:', replyError);
+            }
          }
          return;
       }
@@ -307,7 +316,7 @@ module.exports = {
 
       // 🎫 Ticket creation
       if (customId === 'create_ticket') {
-         await interaction.deferReply({ ephemeral: true });
+         await interaction.deferReply({ flags: 64 });
 
          if (!denLordRole || !customerRole) {
             return interaction.followUp({
@@ -376,25 +385,24 @@ module.exports = {
                const fetchedCategory = await interaction.guild.channels.fetch(openCategoryId);
                if (fetchedCategory && fetchedCategory.type === ChannelType.GuildCategory) {
                   ticketCategory = fetchedCategory;
-                  console.log(`Found open tickets category: ${ticketCategory.name}`);
                } else {
                   console.error(`Channel ${openCategoryId} exists but is not a category. Ticket will NOT be created.`);
                   return await interaction.reply({
                      content: '❌ Ticket category misconfiguration. Please contact an admin.',
-                     ephemeral: true
+                     flags: 64
                   });
                }
             } catch (err) {
                console.error('Error fetching open tickets category:', err);
                return await interaction.reply({
                   content: '❌ Could not find the open tickets category. Please contact an admin.',
-                  ephemeral: true
+                  flags: 64
                });
             }
          } else {
             return await interaction.reply({
                content: '❌ Ticket category is not set in the .env file. Please contact an admin.',
-               ephemeral: true
+               flags: 64
             });
          }
          // --- END ENFORCEMENT ---
@@ -634,7 +642,7 @@ module.exports = {
             const { parseDuration } = require('../utils/createGiveawayUtils');
             const durationMs = parseDuration(duration);
             if (!durationMs || durationMs < 5000) {
-               await interaction.reply({ content: '❌ Invalid duration. Use formats like 1h, 2d, 7d, 10m, etc.', ephemeral: true });
+               await interaction.reply({ content: '❌ Invalid duration. Use formats like 1h, 2d, 7d, 10m, etc.', flags: 64 });
                return;
             }
 
@@ -678,7 +686,7 @@ module.exports = {
 
             await interaction.reply({
                content: `✅ Giveaway started in ${channel}!`,
-               ephemeral: true
+               flags: 64
             });
 
             // Helper to pick winners
@@ -723,16 +731,56 @@ module.exports = {
             }
 
             // Schedule the giveaway end
-            setTimeout(async () => {
+            const timer = setTimeout(async () => {
                try {
+                  // Check if giveaway still exists in database before proceeding
+                  const { loadAllGiveaways } = require('../db/giveaways.db');
+                  const giveaways = await loadAllGiveaways();
+                  const giveawayExists = giveaways.find(g => g.messageId === giveawayMsg.id);
+
+                  if (!giveawayExists) {
+                     console.log(`Giveaway ${giveawayMsg.id} was cancelled, skipping timer execution`);
+                     return;
+                  }
+
                   const msg = await channel.messages.fetch(giveawayMsg.id);
                   await pickWinners(msg, interaction.guild, minRole, numWinners, prize, true);
                   await deleteGiveaway(giveawayMsg.id);
+
+                  // Clean up timer from global store
+                  if (global.giveawayTimers && global.giveawayTimers.has(giveawayMsg.id)) {
+                     global.giveawayTimers.delete(giveawayMsg.id);
+                  }
                } catch (err) {
-                  await channel.send('❌ Error ending the giveaway.');
-                  await deleteGiveaway(giveawayMsg.id);
+                  console.error(`Error ending giveaway ${giveawayMsg.id}:`, err);
+
+                  // Only send error message if the message still exists
+                  try {
+                     await channel.send('❌ Error ending the giveaway.');
+                  } catch (sendError) {
+                     console.error('Could not send error message:', sendError);
+                  }
+
+                  // Always try to clean up
+                  try {
+                     await deleteGiveaway(giveawayMsg.id);
+                  } catch (deleteError) {
+                     console.error('Could not delete giveaway from database:', deleteError);
+                  }
+
+                  // Clean up timer from global store
+                  if (global.giveawayTimers && global.giveawayTimers.has(giveawayMsg.id)) {
+                     global.giveawayTimers.delete(giveawayMsg.id);
+                  }
                }
             }, durationMs);
+
+            // Store the timer in global timer store
+            if (!global.giveawayTimers) {
+               global.giveawayTimers = new Map();
+            }
+            global.giveawayTimers.set(giveawayMsg.id, timer);
+
             return;
          }
 
@@ -800,7 +848,7 @@ async function handleTicketModalSubmit(interaction) {
       const priority = interaction.fields.getTextInputValue('ticketPriority') || 'Medium';
 
       // Defer the reply to give us time to create the channel
-      await interaction.deferReply({ ephemeral: true }).catch(err => {
+      await interaction.deferReply({ flags: 64 }).catch(err => {
          console.error("Failed to defer reply:", err);
          // Continue execution even if deferral fails
       });
@@ -860,25 +908,24 @@ async function handleTicketModalSubmit(interaction) {
             const fetchedCategory = await interaction.guild.channels.fetch(openCategoryId);
             if (fetchedCategory && fetchedCategory.type === ChannelType.GuildCategory) {
                ticketCategory = fetchedCategory;
-               console.log(`Found open tickets category: ${ticketCategory.name}`);
             } else {
                console.error(`Channel ${openCategoryId} exists but is not a category. Ticket will NOT be created.`);
                return await interaction.reply({
                   content: '❌ Ticket category misconfiguration. Please contact an admin.',
-                  ephemeral: true
+                  flags: 64
                });
             }
          } catch (err) {
             console.error('Error fetching open tickets category:', err);
             return await interaction.reply({
                content: '❌ Could not find the open tickets category. Please contact an admin.',
-               ephemeral: true
+               flags: 64
             });
          }
       } else {
          return await interaction.reply({
             content: '❌ Ticket category is not set in the .env file. Please contact an admin.',
-            ephemeral: true
+            flags: 64
          });
       }
       // --- END ENFORCEMENT ---
@@ -955,7 +1002,7 @@ async function handleTicketModalSubmit(interaction) {
       // Send confirmation to the user
       await interaction.editReply({
          content: `✅ Your support ticket has been created! Please check ${ticketChannel} for assistance.`,
-         ephemeral: true
+         flags: 64
       }).catch(err => console.error("Error editing reply:", err));
 
       // Update the queue display if that function exists
@@ -969,7 +1016,7 @@ async function handleTicketModalSubmit(interaction) {
       try {
          await interaction.editReply({
             content: `❌ Error creating ticket: ${error.message}`,
-            ephemeral: true
+            flags: 64
          }).catch(err => console.error("Error editing reply:", err));
       } catch (replyError) {
          console.error('Error sending error message:', replyError);
@@ -990,7 +1037,7 @@ async function handleRobloxDevTicketModalSubmit(interaction) {
       const timeline = interaction.fields.getTextInputValue('robloxTicketTimeline') || 'Not specified';
 
       // Defer the reply to give us time to create the channel
-      await interaction.deferReply({ ephemeral: true }).catch(err => {
+      await interaction.deferReply({ flags: 64 }).catch(err => {
          console.error("Failed to defer reply:", err);
          // Continue execution even if deferral fails
       });
@@ -1047,25 +1094,24 @@ async function handleRobloxDevTicketModalSubmit(interaction) {
             const fetchedCategory = await interaction.guild.channels.fetch(openCategoryId);
             if (fetchedCategory && fetchedCategory.type === ChannelType.GuildCategory) {
                ticketCategory = fetchedCategory;
-               console.log(`Found open tickets category: ${ticketCategory.name}`);
             } else {
                console.error(`Channel ${openCategoryId} exists but is not a category. Ticket will NOT be created.`);
                return await interaction.reply({
                   content: '❌ Ticket category misconfiguration. Please contact an admin.',
-                  ephemeral: true
+                  flags: 64
                });
             }
          } catch (err) {
             console.error('Error fetching open tickets category:', err);
             return await interaction.reply({
                content: '❌ Could not find the open tickets category. Please contact an admin.',
-               ephemeral: true
+               flags: 64
             });
          }
       } else {
          return await interaction.reply({
             content: '❌ Ticket category is not set in the .env file. Please contact an admin.',
-            ephemeral: true
+            flags: 64
          });
       }
       // --- END ENFORCEMENT ---
@@ -1144,7 +1190,7 @@ async function handleRobloxDevTicketModalSubmit(interaction) {
       // Send confirmation to the user
       await interaction.editReply({
          content: `✅ Your Roblox Game Dev Service ticket has been created! Please check ${ticketChannel} for assistance.`,
-         ephemeral: true
+         flags: 64
       }).catch(err => console.error("Error editing reply:", err));
 
       // Update the queue display if that function exists
@@ -1158,7 +1204,7 @@ async function handleRobloxDevTicketModalSubmit(interaction) {
       try {
          await interaction.editReply({
             content: `❌ Error creating Roblox dev ticket: ${error.message}`,
-            ephemeral: true
+            flags: 64
          }).catch(err => console.error("Error editing reply:", err));
       } catch (replyError) {
          console.error('Error sending error message:', replyError);
