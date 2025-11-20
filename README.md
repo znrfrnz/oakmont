@@ -1,36 +1,36 @@
-# 🏪 Gambler's Den Discord Bot
+# Oakmont
 
-A feature-rich Discord bot for managing a pet shop with ticket system, order management, and smart inventory tracking.
+A feature-rich Discord bot for managing a grow a garden shop with ticket system, order management, and smart inventory tracking.
 
-## ✨ Features
+## Features
 
-### 🎫 **Ticket System**
+### **Ticket System**
 - Support ticket creation with modal forms
 - Ticket processing and completion workflows
 - Automatic channel archiving
 - Transcript generation
 
-### 🛒 **Order Management**
+### **Order Management**
 - **Smart Item Matching**: Uses Levenshtein distance, acronym support, and partial matching
 - **Confirmation Buttons**: Yes/No buttons for actions
 - **Smart Suggestions**: Helpful alternatives when no match found
 - **Real-time Updates**: Live inventory tracking
 - **Sheckle Orders**: Users can now order sheckles
 
-### 📦 **Stock Management**
+### **Stock Management**
 - Dynamic stock embed with real-time updates
 - Smart item removal with confirmation buttons
 - Beautiful, readable inventory display
 - Low stock alerts
 
-### ❓ **FAQ System**
+### **FAQ System**
 - Dynamic FAQ management with modal forms
 - Easy editing and reordering with select menus
 - Persistent storage in SQLite database
 - Automatic embed updates in designated channel
 - Position-based ordering system
 
-## 🚀 Setup
+## Setup
 
 ### Prerequisites
 - Node.js (v16 or higher)
@@ -78,7 +78,7 @@ A feature-rich Discord bot for managing a pet shop with ticket system, order man
    node index.js
    ```
 
-## 📋 Commands
+## Commands
 
 ### Admin Commands
 - `/helpdesk` - Create help desk panels
@@ -98,7 +98,7 @@ A feature-rich Discord bot for managing a pet shop with ticket system, order man
 - `/ticket` - Ticket management commands
 - `/faq` - FAQ management
 
-## 🎯 Smart Features
+## Smart Features
 
 ### **Intelligent Item Matching**
 - **Misspelling Detection**: Uses Levenshtein distance
@@ -112,7 +112,7 @@ A feature-rich Discord bot for managing a pet shop with ticket system, order man
 - **Real-time Updates**: Live inventory tracking
 - **Beautiful Embeds**: Professional-looking displays
 
-## 🔧 Configuration
+## Configuration
 
 ### Required Discord Permissions
 - Manage Channels
@@ -126,7 +126,7 @@ A feature-rich Discord bot for managing a pet shop with ticket system, order man
 2. Set up shop channel for inventory display
 3. Configure logs channel for transcript storage
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 oakmont/
@@ -140,15 +140,7 @@ oakmont/
 └── deploy-commands.js # Command deployment
 ```
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
+## License
 
 This project is licensed under the MIT License.
 
